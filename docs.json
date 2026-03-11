@@ -1,0 +1,33 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "palm",
+  "name": "Noetive",
+  "colors": {
+    "primary": "#0D9373"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "quickstart",
+          "pricing"
+        ]
+      }
+    ]
+  },
+  "description": "Noetive Developer Documentation",
+  "favicon": "/images/favicon-32x32.png",
+  "logo": {
+    "light": "/images/noetive-logo-io-darkbg.png",
+    "dark": "/images/noetive-logo-io-lightbg.png",
+    "href": "https://www.noetive.io"
+  },
+  "background": {
+    "decoration": "gradient"
+  },
+  "appearance": {
+    "strict": true,
+    "default": "system"
+  }
+}
