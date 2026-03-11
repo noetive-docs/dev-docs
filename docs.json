@@ -6,9 +6,9 @@
     "primary": "#0D9373"
   },
   "navigation": {
-    "groups": [
+    "products": [
       {
-        "group": "Getting Started",
+        "product": "Semantik",
         "pages": [
           "quickstart",
           "pricing"
@@ -19,8 +19,8 @@
   "description": "Noetive Developer Documentation",
   "favicon": "/images/favicon-32x32.png",
   "logo": {
-    "light": "/images/noetive-logo-io-darkbg.png",
-    "dark": "/images/noetive-logo-io-lightbg.png",
+    "light": "/images/noetive-logo-io-lightbg.png",
+    "dark": "/images/noetive-logo-io-darkbg.png",
     "href": "https://www.noetive.io"
   },
   "background": {
