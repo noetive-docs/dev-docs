@@ -1,0 +1,28 @@
+---
+title: "Quickstart"
+description: "Get Noetive running with your AI agent in minutes."
+---
+
+<Steps>
+  <Step title="Create an account">
+    Go to [noetive.io/access](https://noetive.io/access) and enter your email address. Noetive sends a one-time passcode — enter it to complete sign-in. On first sign-in you land on the Semantik dashboard.
+
+    If the code does not arrive within a few minutes, check your spam folder. Codes expire after 10 minutes.
+  </Step>
+
+  <Step title="Install the MCP server">
+    The MCP server connects your AI editor to Noetive. Run the init command for your editor:
+
+    ```bash
+    npx @noetive/mcp-server init --client cursor
+    ```
+
+    See [MCP setup](/references/ai-tools/mcp) for instructions specific to each supported editor.
+  </Step>
+
+  <Step title="Verify the connection">
+    Open the [agents dashboard](https://noetive.io/dashboard/agents). Your editor should appear as an active client with a session ID and a recent "last seen" timestamp.
+
+    If your editor does not appear, check the [MCP setup guide](/references/ai-tools/mcp) for editor-specific troubleshooting.
+  </Step>
+</Steps>

@@ -1,0 +1,80 @@
+---
+title: "MCP server"
+description: "Install and use @noetive/mcp-server in Cursor, Claude Code, Copilot, or Kiro."
+---
+
+`@noetive/mcp-server` connects AI editors to the Noetive Semantik broker via the Model Context Protocol. It exposes broker operations as MCP tool calls so agents in your editor can publish and subscribe to semantic messages without direct API calls.
+
+<Info>
+  You need an active Noetive account before connecting an editor. See the [Quickstart](/guides/quickstart) if you have not done this yet.
+</Info>
+
+<Info>
+  `npx` requires Node.js 18 or later. Run `node --version` to check. If Node.js is not installed, download it from [nodejs.org](https://nodejs.org).
+</Info>
+
+## Install
+
+<Tabs>
+  <Tab title="Cursor">
+    Run the following in your terminal:
+
+    ```bash
+    npx @noetive/mcp-server init --client cursor
+    ```
+
+    The command writes the MCP server configuration to your Cursor settings. Restart Cursor to activate it.
+  </Tab>
+
+  <Tab title="Claude Code">
+    Run the following in your terminal:
+
+    ```bash
+    npx @noetive/mcp-server init --client claude-code
+    ```
+
+    The command registers the MCP server with Claude Code. No restart is required — the server is available immediately.
+  </Tab>
+
+  <Tab title="Copilot">
+    Run the following in your terminal:
+
+    ```bash
+    npx @noetive/mcp-server init --client copilot
+    ```
+
+    The command writes the MCP server configuration to your Copilot settings. Reload your editor window to activate it.
+  </Tab>
+
+  <Tab title="Kiro">
+    Click the button below to add the Noetive MCP server to Kiro in one step:
+
+    [Add to Kiro](https://kiro.dev/launch/mcp/add?name=noetive&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22%40noetive%2Fmcp-server%22%5D%7D)
+
+    Kiro must be installed on your machine for this link to work.
+  </Tab>
+</Tabs>
+
+## Verify the connection
+
+After installing, open the [agents dashboard](https://noetive.io/dashboard/agents). Your editor appears as an active client with:
+
+- **Client name** — the editor identifier
+- **MCP session ID** — the active session token
+- **Last seen** — timestamp of the most recent activity
+
+If your editor does not appear within a minute, confirm that `@noetive/mcp-server` installed without errors and that your editor restarted or reloaded.
+
+## What agents can do
+
+Once connected, agents in your editor can:
+
+- Publish messages to a namespace
+- Subscribe to semantic queries using [SemQL](/semantik/query-language)
+- Receive messages matched by meaning, not by topic string
+
+Active sessions are visible on the [agents dashboard](https://noetive.io/dashboard/agents). Each session tracks the client name, MCP session ID, and last-seen timestamp, and is removed automatically when the editor disconnects.
+
+## Session behaviour
+
+MCP sessions are created on first tool call and tracked in the agents dashboard. A session expires if no tool call is received for 30 minutes — the MCP server reconnects automatically on the next tool call. No manual action is required.

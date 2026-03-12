@@ -1,0 +1,16 @@
+---
+title: "Claude Code skills"
+description: "Reusable slash-command extensions for Claude Code."
+---
+
+Skills are reusable prompt files that extend Claude Code with curated instructions for a specific task. Reference a skill by name in your prompt:
+
+```
+load the semql skill and write a subscription for payment failure signals
+```
+
+Claude Code reads the skill file and applies its instructions to the task. Skills are session-scoped — they apply for the duration of the conversation.
+
+## Installing skills
+
+Download skill files from the [Noetive GitHub repository](https://github.com/noetive) into a `skills/` directory in your project. Claude Code discovers them automatically when you work in that directory.

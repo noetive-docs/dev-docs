@@ -1,0 +1,20 @@
+---
+title: "Usage"
+description: "View your daily request, token, and storage consumption."
+---
+
+Go to [Settings → Usage](https://noetive.io/settings/usage). Select a year, then a month to see one row per day. The footer row sums the selected month.
+
+## Metrics
+
+| Metric | Unit | What it measures |
+|--------|------|-----------------|
+| Requests | count | API calls to the Semantik broker — each publish or subscribe operation is one request |
+| Tokens | count | LLM input and output tokens plus embedding tokens; one token ≈ one word |
+| Storage | GB-hours | Message data retained, measured as gigabytes × hours stored |
+
+Data from the current day updates throughout the day and is finalised at end of day UTC.
+
+## Billing relationship
+
+Usage feeds directly into your weekly metered invoice. See [Billing](/platform/billing) for rates and subscription status.

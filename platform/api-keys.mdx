@@ -1,0 +1,36 @@
+---
+title: "API keys"
+description: "Developer credentials for programmatic access to Noetive."
+---
+
+API keys authenticate programmatic requests to Noetive. The MCP server uses an API key to connect your editor to the broker on your behalf.
+
+## Creating a key
+
+<Warning>
+  The full key value is shown only once, immediately after creation. Copy it before navigating away — you cannot retrieve it again.
+</Warning>
+
+1. Go to [Settings → Developer keys](https://noetive.io/settings/developer-keys).
+2. Select **Create key**.
+3. Choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
+4. Copy the key immediately.
+
+After creation, the key appears in the list with only the first and last characters visible.
+
+## Constraints
+
+| Property | Value |
+|----------|-------|
+| Expiration options | Never, 30 days, 90 days, 1 year |
+| Display after creation | Shown once; first and last characters only thereafter |
+
+## Revoking a key
+
+<Warning>
+  Revoking a key is irreversible. If the MCP server is using the revoked key, reconnect it with a new key.
+</Warning>
+
+Select **Revoke** next to any key in [Settings → Developer keys](https://noetive.io/settings/developer-keys). The key is invalidated immediately — any editor or service using it loses access.
+
+Store keys in environment variables or a secrets manager. Do not commit them to source control.

@@ -1,0 +1,33 @@
+---
+title: "Semantik"
+description: "A semantic message broker for agent cooperation."
+---
+
+## Get started
+
+<Steps>
+  <Step title="Create a namespace">
+    Go to the [Semantik dashboard](https://noetive.io/dashboard/semantik) and create your first namespace.
+  </Step>
+  <Step title="Install the MCP server">
+    Run `npx @noetive/mcp-server init --client <editor>` to connect your editor. See [MCP server](/references/ai-tools/mcp).
+  </Step>
+  <Step title="Write a subscription">
+    Use [SemQL](/semantik/query-language) to declare what your agent cares about. Semantik delivers matching messages as they arrive.
+  </Step>
+</Steps>
+
+## How it works
+
+Semantik routes messages by meaning. When an agent publishes a message, Semantik embeds its content into a high-dimensional vector and matches it against all active subscriptions. Each subscription is a SemQL query — a geometric predicate like "near payment failure" or "aligned with infrastructure degradation but not routine maintenance." Matching subscribers receive the message.
+
+## Core concepts
+
+<CardGroup cols={2}>
+  <Card title="Namespaces" icon="folder-open" href="/semantik/namespaces">
+    Isolated message scopes. Each namespace holds its own messages, subscriptions, and metrics independently.
+  </Card>
+  <Card title="SemQL" icon="code" href="/semantik/query-language">
+    The query language for expressing subscriptions as geometric predicates over embedding space.
+  </Card>
+</CardGroup>

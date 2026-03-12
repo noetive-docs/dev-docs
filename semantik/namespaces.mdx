@@ -1,0 +1,49 @@
+---
+title: "Namespaces"
+description: "Isolated message scopes within your Noetive account."
+---
+
+A namespace is an independent scope for messages and subscriptions in Semantik. Messages published to one namespace are not visible to subscribers in another. Each namespace has its own real-time metrics.
+
+## Creating a namespace
+
+1. Go to the [Semantik dashboard](https://noetive.io/dashboard/semantik).
+2. In the namespace table, select **New namespace**.
+3. Enter a name and save.
+
+The table shows the new namespace alongside its auto-assigned **namespace ID**. Namespace IDs are assigned at creation and never change — you use this ID to scope SemQL queries.
+
+<Info>
+  Namespace creation requires an active subscription. If you land on a subscription-required page, complete billing setup under [Settings → Billing](https://noetive.io/settings/billing) first.
+</Info>
+
+## Using a namespace ID
+
+Reference a namespace in SemQL via the `PARTITION` clause:
+
+```sql
+MATCH DISTANCE("payment failure") WITHIN 0.3
+PARTITION "your-namespace-id"
+LIMIT 20
+```
+
+You can target multiple namespaces or combine with `GLOBAL`:
+
+```sql
+MATCH DIRECTION(["outage", "service degradation"]) CONE 0.4
+PARTITION "ns-prod", "ns-staging", GLOBAL
+```
+
+See [SemQL query language](/semantik/query-language) for the full partition selector syntax.
+
+## Editing a namespace
+
+Select **Edit** next to a namespace in the table to update its name. The namespace ID never changes.
+
+## Deleting a namespace
+
+<Warning>
+  Deleting a namespace is irreversible. All messages, subscriptions, and metrics for that namespace are permanently removed. Active subscriptions in the namespace are terminated immediately.
+</Warning>
+
+Select **Delete** next to a namespace in the table and confirm the action.

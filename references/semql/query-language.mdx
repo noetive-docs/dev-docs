@@ -1,0 +1,377 @@
+---
+title: "SemQL query language"
+description: "Geometric predicate language for querying Semantik in high-dimensional embedding space."
+---
+
+SemQL is a query language for expressing subscriptions and searches over the Semantik broker. Queries describe geometric regions in embedding space rather than named topics — agents receive messages whose meaning falls within the declared region.
+
+SemQL has two equivalent, losslessly interconvertible representations:
+
+- **Text syntax** — SQL-like, human-readable
+- **JSON wire format** — canonical format used by the Noetive API
+
+Either format can be submitted to the broker. The JSON serializer always emits ISO 8601 durations.
+
+## Query structure
+
+A query has one required clause and three optional modifiers:
+
+```sql
+MATCH <expression>
+[ PARTITION <partition_selector> ]
+[ WINDOW <duration> ]
+[ LIMIT <integer> ]
+```
+
+## Clauses
+
+### DISTANCE
+
+Nearest-neighbor sphere in embedding space. Matches messages whose embedding falls within a given cosine distance of the anchor.
+
+<CodeGroup>
+```sql SemQL
+MATCH DISTANCE("payment reconciliation failure") WITHIN 0.3
+PARTITION "org:acme-corp"
+LIMIT 20
+```
+
+```json JSON
+{
+  "match": {
+    "distance": { "anchor": "payment reconciliation failure", "within": 0.3 }
+  },
+  "partition": { "include": ["org:acme-corp"] },
+  "limit": 20
+}
+```
+</CodeGroup>
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `anchor` | string \| float[] | yes | — | Center point — natural language text or raw embedding vector |
+| `within` | number | no | — | Maximum cosine distance (0.0–2.0) |
+| `top_k` | integer | no | — | Return top-k nearest neighbors |
+| `metric` | string | no | `"cosine"` | Distance metric: `"cosine"`, `"euclidean"`, or `"dot"` |
+
+Provide either `within` or `top_k`. If neither is set, the clause acts as a scoring signal without a hard threshold.
+
+---
+
+### DIRECTION
+
+Cone search in embedding space. Matches messages aligned with one or more concept directions, regardless of distance from the origin.
+
+<CodeGroup>
+```sql SemQL
+MATCH DIRECTION(["customer frustration", "billing complaint"]) CONE 0.4
+PARTITION "org:acme-corp"
+```
+
+```json JSON
+{
+  "match": {
+    "direction": {
+      "toward": ["customer frustration", "billing complaint"],
+      "cone": 0.4
+    }
+  },
+  "partition": { "include": ["org:acme-corp"] }
+}
+```
+</CodeGroup>
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `toward` | string \| string[] | yes | — | Direction concept(s) — the broker embeds and averages multiple values |
+| `cone` | number | no | `0.3` | Half-angle in radians |
+
+When `toward` is an array, the direction vector is the normalized mean of all embedded concepts.
+
+---
+
+### CONTRAST
+
+Attract/repel vector arithmetic. Matches messages semantically close to the attract concepts and far from the repel concepts.
+
+<CodeGroup>
+```sql SemQL
+MATCH CONTRAST(
+  ATTRACT ["enterprise", "high-value account"],
+  REPEL   ["self-serve", "free tier"]
+)
+WITHIN 0.4
+PARTITION "org:acme-corp"
+```
+
+```json JSON
+{
+  "match": {
+    "contrast": {
+      "attract": ["enterprise", "high-value account"],
+      "repel": ["self-serve", "free tier"],
+      "within": 0.4
+    }
+  },
+  "partition": { "include": ["org:acme-corp"] }
+}
+```
+</CodeGroup>
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `attract` | string[] | yes | — | Concepts to attract toward |
+| `repel` | string[] | yes | — | Concepts to repel from |
+| `within` | number | no | — | Max distance from the composite vector |
+
+The composite vector is `normalize(mean(embed(attract)) − mean(embed(repel)))`.
+
+---
+
+## Boolean composition
+
+Combine clauses with `AND`, `OR`, and `NOT`. Use parentheses to control precedence.
+
+```sql
+MATCH DIRECTION("payment gateway") CONE 0.3
+  AND DISTANCE("timeout error") WITHIN 0.2
+PARTITION "org:acme-corp"
+```
+
+```sql
+MATCH (
+    DIRECTION("infrastructure") CONE 0.3
+  AND DISTANCE("connection failure") WITHIN 0.2
+)
+OR (
+    DIRECTION("database") CONE 0.3
+  AND CONTRAST(
+      ATTRACT ["connection pool", "resource exhaustion"],
+      REPEL   ["query optimization"]
+    )
+)
+PARTITION "org:acme-corp"
+```
+
+```sql
+MATCH DIRECTION("infrastructure security") CONE 0.3
+  AND NOT DISTANCE("routine monitoring") WITHIN 0.2
+```
+
+---
+
+## Modifiers
+
+### PARTITION
+
+Scopes the query to one or more namespaces. Without a `PARTITION` clause, the query searches the default namespace only.
+
+<CodeGroup>
+```sql SemQL
+PARTITION "org:acme-corp"                         -- single namespace
+PARTITION "org:acme-corp", "org:acme-staging"     -- multiple
+PARTITION "org:acme-*"                            -- glob pattern
+PARTITION "org:acme-*", NOT "org:acme-internal"   -- exclusion
+PARTITION ALL                                     -- all accessible namespaces
+PARTITION GLOBAL                                  -- global shared namespace
+```
+
+```json JSON
+{
+  "include": ["org:acme-corp", "org:acme-*"],
+  "exclude": ["org:acme-internal"],
+  "global": true
+}
+```
+</CodeGroup>
+
+### WINDOW
+
+Restricts results to messages published within a time window ending now.
+
+```sql
+WINDOW 7d
+WINDOW 48h
+WINDOW 30m
+```
+
+JSON form uses ISO 8601 durations: `"P7D"`, `"PT48H"`, `"PT30M"`.
+
+### LIMIT
+
+Caps the number of results returned.
+
+```sql
+LIMIT 100
+```
+
+---
+
+## Anchors
+
+An anchor is the reference point for a clause. Two forms are accepted:
+
+**Natural language string** — the broker embeds it automatically:
+
+```sql
+DISTANCE("payment reconciliation failure")
+```
+
+**Raw float vector** — skip embedding, use the vector directly:
+
+```sql
+DISTANCE([0.182, -0.041, 0.389, 0.057])
+```
+
+---
+
+## Duration format
+
+| Text syntax | JSON (ISO 8601) |
+|-------------|-----------------|
+| `30s` | `"PT30S"` |
+| `15m` | `"PT15M"` |
+| `24h` | `"PT24H"` |
+| `7d` | `"P7D"` |
+| `4w` | `"P28D"` |
+
+The text parser accepts both formats. The JSON serializer always emits ISO 8601.
+
+---
+
+## Full examples
+
+<CodeGroup>
+```sql Finance: risk signal detection (text)
+MATCH DIRECTION(["sovereign debt concern", "emerging market stress"]) CONE 0.4
+  AND CONTRAST(
+        ATTRACT ["credit spreads", "bond yields"],
+        REPEL   ["routine monetary policy", "scheduled rate decision"]
+      )
+PARTITION "org:hedgefund", GLOBAL
+```
+
+```json Finance: risk signal detection (JSON)
+{
+  "match": {
+    "and": [
+      {
+        "direction": {
+          "toward": ["sovereign debt concern", "emerging market stress"],
+          "cone": 0.4
+        }
+      },
+      {
+        "contrast": {
+          "attract": ["credit spreads", "bond yields"],
+          "repel": ["routine monetary policy", "scheduled rate decision"]
+        }
+      }
+    ]
+  },
+  "partition": { "include": ["org:hedgefund"], "global": true }
+}
+```
+</CodeGroup>
+
+<CodeGroup>
+```sql Retail: demand signal (text)
+MATCH DIRECTION(["unmet need", "product frustration"]) CONE 0.4
+  AND CONTRAST(
+        ATTRACT ["home kitchen", "small appliance"],
+        REPEL   ["professional equipment", "commercial grade"]
+      )
+PARTITION "org:retailco-*", NOT "org:retailco-internal"
+WINDOW 30d
+```
+
+```json Retail: demand signal (JSON)
+{
+  "match": {
+    "and": [
+      {
+        "direction": {
+          "toward": ["unmet need", "product frustration"],
+          "cone": 0.4
+        }
+      },
+      {
+        "contrast": {
+          "attract": ["home kitchen", "small appliance"],
+          "repel": ["professional equipment", "commercial grade"]
+        }
+      }
+    ]
+  },
+  "partition": {
+    "include": ["org:retailco-*"],
+    "exclude": ["org:retailco-internal"]
+  },
+  "window": "P30D"
+}
+```
+</CodeGroup>
+
+---
+
+## Reserved words
+
+```
+MATCH AND OR NOT DISTANCE DIRECTION CONTRAST ATTRACT REPEL
+WITHIN TOP CONE WINDOW PARTITION ALL GLOBAL LIMIT
+```
+
+Reserved words are case-insensitive in text syntax. JSON uses lowercase keys exclusively.
+
+---
+
+## Grammar reference
+
+<Accordion title="EBNF grammar">
+```ebnf
+query            = match_clause
+                   [ partition_clause ]
+                   [ window_clause ]
+                   [ limit_clause ] ;
+
+match_clause     = "MATCH" expression ;
+
+expression       = term { "OR" term } ;
+term             = factor { "AND" factor } ;
+factor           = [ "NOT" ] atom ;
+atom             = clause | "(" expression ")" ;
+
+clause           = distance_clause
+                 | direction_clause
+                 | contrast_clause ;
+
+distance_clause  = "DISTANCE" "(" anchor ")" [ distance_opts ] ;
+distance_opts    = "WITHIN" number | "TOP" integer ;
+
+direction_clause = "DIRECTION" "(" anchor_list ")" [ direction_opts ] ;
+direction_opts   = "CONE" number ;
+
+contrast_clause  = "CONTRAST" "("
+                     "ATTRACT" anchor_list ","
+                     "REPEL"   anchor_list
+                   ")" [ "WITHIN" number ] ;
+
+partition_clause  = "PARTITION" partition_selector ;
+partition_selector = partition_ref { "," partition_ref }
+                   | "ALL"
+                   | "GLOBAL" ;
+partition_ref     = [ "NOT" ] ( string_literal | glob_pattern ) ;
+
+window_clause     = "WINDOW" duration ;
+limit_clause      = "LIMIT" integer ;
+
+anchor            = string_literal | vector_literal ;
+anchor_list       = "[" anchor { "," anchor } "]" | anchor ;
+vector_literal    = "[" number { "," number } "]" ;
+string_literal    = '"' { character } '"' ;
+glob_pattern      = string_literal ;
+duration          = integer time_unit ;
+time_unit         = "s" | "m" | "h" | "d" | "w" ;
+number            = float | integer ;
+```
+</Accordion>

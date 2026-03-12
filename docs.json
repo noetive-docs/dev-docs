@@ -3,18 +3,9 @@
   "theme": "palm",
   "name": "Noetive",
   "colors": {
-    "primary": "#0D9373"
-  },
-  "navigation": {
-    "products": [
-      {
-        "product": "Semantik",
-        "pages": [
-          "quickstart",
-          "pricing"
-        ]
-      }
-    ]
+    "primary": "#a855f7",
+    "light": "#a855f7",
+    "dark": "#a855f7"
   },
   "description": "Noetive Developer Documentation",
   "favicon": "/images/favicon-32x32.png",
@@ -24,10 +15,96 @@
     "href": "https://www.noetive.io"
   },
   "background": {
-    "decoration": "gradient"
+    "decoration": "gradient",
+    "light": "#FDFBF7",
+    "dark": "#0f172a"
   },
   "appearance": {
-    "strict": true,
     "default": "system"
+  },
+  "font": {
+    "headings": {
+      "family": "Outfit"
+    },
+    "body": {
+      "family": "Space Grotesk"
+    }
+  },
+  "css": "style.css",
+  "errors": {
+    "404": {
+      "redirect": false,
+      "title": "Page not found",
+      "description": "This page doesn't exist or has moved."
+    }
+  },
+  "search": {
+    "prompt": "Search docs..."
+  },
+  "seo": {
+    "indexing": "all"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/noetive"
+    },
+    {
+      "name": "Support",
+      "icon": "mail",
+      "url": "https://www.noetive.io/support"
+    }
+  ],
+  "topbar": {
+    "links": [
+      { "name": "Semantik", "url": "https://www.noetive.io/semantik" },
+      { "name": "MCP", "url": "https://www.noetive.io/mcp" },
+      { "name": "Pricing", "url": "https://www.noetive.io/pricing" },
+      { "name": "Blog", "url": "https://www.noetive.io/blog" },
+      { "name": "Use Cases", "url": "https://www.noetive.io/patterns" }
+    ],
+    "cta": {
+      "name": "Get started",
+      "url": "https://www.noetive.io/access"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Noetive",
+        "groups": [
+          { "group": "Getting started", "pages": ["guides/quickstart"] },
+          { "group": "Overview", "pages": ["platform/architecture"] },
+          { "group": "Account", "pages": ["platform/api-keys"] },
+          { "group": "Billing", "pages": ["platform/billing", "platform/usage"] },
+          { "group": "MCP", "pages": ["references/ai-tools/mcp"] },
+          { "group": "Skills", "pages": ["references/ai-tools/skills"] }
+        ]
+      },
+      {
+        "tab": "Semantik",
+        "groups": [
+          { "group": "Getting started", "pages": ["semantik/overview", "semantik/namespaces"] },
+{ "group": "SemQL", "pages": ["semantik/query-language"] }
+        ]
+      }
+    ]
+  },
+  "redirects": [
+    { "source": "/quickstart", "destination": "/guides/quickstart" },
+    { "source": "/pricing", "destination": "/platform/billing" }
+  ],
+  "footer": {
+    "socials": {
+      "github": "https://github.com/noetive",
+      "linkedin": "https://www.linkedin.com/company/noetive",
+      "bluesky": "https://bsky.app/profile/noetive.bsky.social"
+    }
   }
 }

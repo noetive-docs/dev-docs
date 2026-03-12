@@ -1,0 +1,108 @@
+/* (c) 2026 Noetive */
+
+/* ─── Brand tokens ─────────────────────────────────────────── */
+
+:root {
+  --noetive-purple:  #a855f7;
+  --noetive-violet:  #7c3aed;
+  --noetive-navy:    #1e1b4b;
+  --noetive-teal:    #2dd4bf;
+  --noetive-blue:    #60a5fa;
+  --noetive-pink:    #f472b6;
+  --noetive-warm:    #FDFBF7;
+  --noetive-shadow:  2px 2px 0 0 rgba(0, 0, 0, 1);
+}
+
+/* ─── Typography ───────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Selection ────────────────────────────────────────────── */
+
+::selection {
+  background: var(--noetive-purple);
+  color: #fff;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #000;
+  border-radius: 4px;
+  border: 2px solid var(--noetive-warm);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--noetive-purple);
+  border-color: #0f172a;
+}
+
+/* ─── Code blocks ──────────────────────────────────────────── */
+
+pre {
+  background: var(--noetive-navy) !important;
+  border: 2px solid #000 !important;
+  box-shadow: var(--noetive-shadow) !important;
+  border-radius: 0.5rem !important;
+}
+
+.dark pre {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: none !important;
+}
+
+/* ─── Inline code ──────────────────────────────────────────── */
+
+:not(pre) > code {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+}
+
+.dark :not(pre) > code {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+}
+
+/* ─── Blockquotes ──────────────────────────────────────────── */
+
+blockquote {
+  border-left: 3px solid var(--noetive-purple);
+  padding-left: 1rem;
+  color: #475569;
+  font-style: normal;
+}
+
+.dark blockquote {
+  border-left-color: var(--noetive-purple);
+  color: #94a3b8;
+}
+
+/* ─── Multi-colour shadow animation ────────────────────────── */
+
+@keyframes shadow-morph {
+  0%   { box-shadow:  4px  4px 0 0 var(--noetive-purple), -4px -4px 0 0 var(--noetive-teal),  4px -4px 0 0 var(--noetive-blue), -4px  4px 0 0 var(--noetive-pink); }
+  25%  { box-shadow: -4px  4px 0 0 var(--noetive-blue),   4px -4px 0 0 var(--noetive-pink), -4px -4px 0 0 var(--noetive-purple),  4px  4px 0 0 var(--noetive-teal); }
+  50%  { box-shadow: -4px -4px 0 0 var(--noetive-pink),   4px  4px 0 0 var(--noetive-blue), -4px  4px 0 0 var(--noetive-teal),   4px -4px 0 0 var(--noetive-purple); }
+  75%  { box-shadow:  4px -4px 0 0 var(--noetive-teal),  -4px  4px 0 0 var(--noetive-purple),  4px  4px 0 0 var(--noetive-pink), -4px -4px 0 0 var(--noetive-blue); }
+  100% { box-shadow:  4px  4px 0 0 var(--noetive-purple), -4px -4px 0 0 var(--noetive-teal),  4px -4px 0 0 var(--noetive-blue), -4px  4px 0 0 var(--noetive-pink); }
+}
+
+.shadow-morph {
+  animation: shadow-morph 3s ease-in-out infinite;
+}

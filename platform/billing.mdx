@@ -1,0 +1,35 @@
+---
+title: "Billing"
+description: "Subscription and metered usage billing for Noetive."
+---
+
+<Info>
+  Metered usage (requests, tokens, storage) is billed **weekly**. The namespace fee is billed monthly. Check [Settings → Usage](https://noetive.io/settings/usage) to track spend before each weekly invoice.
+</Info>
+
+| Charge | Cadence | What it covers |
+|--------|---------|----------------|
+| Namespace fee | Monthly | Flat rate per active namespace |
+| Requests | Weekly | API calls to the Semantik broker |
+| Tokens | Weekly | LLM input/output tokens and embedding tokens |
+| Storage | Weekly | GB-hours of stored message data |
+
+For current rates, see [noetive.io/pricing](https://noetive.io/pricing).
+
+## Subscription status
+
+| Status | What it means |
+|--------|---------------|
+| Active | Billing is current; all features available |
+| Pending | A payment is being processed |
+| Cancelled | Subscription ended; namespace creation disabled |
+
+If a payment fails, Noetive sends a reminder email three days after the missed payment. On cancellation, existing namespaces remain readable until the end of the billing period.
+
+## Viewing invoices
+
+Go to [Settings → Billing](https://noetive.io/settings/billing) to see your invoice history. Each row shows the invoice date, amount, status (paid, open, or void), and a PDF download link.
+
+## Managing payment
+
+Select **Manage billing** to open the Stripe customer portal where you can update your payment method, change your plan, or cancel.

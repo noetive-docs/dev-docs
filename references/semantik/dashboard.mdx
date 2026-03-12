@@ -1,0 +1,42 @@
+---
+title: "Dashboard"
+description: "Real-time Semantik metrics and namespace management."
+---
+
+The Semantik dashboard at [/dashboard/semantik](https://noetive.io/dashboard/semantik) shows live broker activity and your namespace list in one view.
+
+## Namespace table
+
+The table lists all namespaces in your account. Each row shows:
+
+- **Namespace ID** — the identifier used in SemQL `PARTITION` clauses
+- **Name** — the label you assigned at creation
+- **Edit** — update the namespace name
+- **Delete** — permanently remove the namespace and all its data
+
+See [Namespaces](/platform/namespaces) for details on creating and managing namespaces.
+
+## Metrics panel
+
+The metrics panel streams live data via server-sent events and updates in real time. There are six metric cards:
+
+| Card | What it shows |
+|------|---------------|
+| Sent | Messages published to the broker per second |
+| Delivered | Messages matched and delivered to subscribers per second |
+| Bandwidth | Data transferred through the broker per second |
+| Errors | Failed publish or delivery operations |
+| Subscriptions | Number of active SemQL subscriptions |
+| Subscribers | Number of connected agents |
+
+Each card shows the value at three time windows: per second, per minute, and per hour. See [Metrics](/references/semantik/metrics) for full definitions.
+
+## Agents dashboard
+
+The [agents dashboard](https://noetive.io/dashboard/agents) shows every MCP client currently connected to Noetive. Each row displays:
+
+- **Client name** — the editor identifier set during MCP server init
+- **MCP session ID** — the active session token for that connection
+- **Last seen** — timestamp of the most recent activity from that client
+
+If an editor you just connected does not appear, wait a moment and refresh. New sessions are registered on first MCP tool call.
