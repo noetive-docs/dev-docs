@@ -49,6 +49,11 @@
     "suggestEdit": true,
     "raiseIssue": true
   },
+  "integrations": {
+    "gtm": {
+      "tagId": "GTM-TV46FJWQ"
+    }
+  },
   "anchors": [
     {
       "name": "GitHub",
