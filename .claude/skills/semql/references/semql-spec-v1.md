@@ -3,7 +3,7 @@
 ## Grammar (EBNF)
 
 ```ebnf
-query       = "MATCH" expression [ "PARTITION" partition ] [ "WINDOW" duration ] [ "LIMIT" integer ]
+query       = "MATCH" expression [ "NAMESPACE" namespace ] [ "WINDOW" duration ] [ "LIMIT" integer ]
 expression  = term { "OR" term }
 term        = factor { "AND" factor }
 factor      = [ "NOT" ] ( clause | "(" expression ")" )
@@ -13,8 +13,9 @@ distance    = "DISTANCE" "(" anchor ")" [ "WITHIN" number | "TOP" integer ]
 direction   = "DIRECTION" "(" anchor_list ")" [ "CONE" number ]
 contrast    = "CONTRAST" "(" "ATTRACT" anchor_list "," "REPEL" anchor_list ")" [ "WITHIN" number ]
 
-partition   = partition_ref { "," partition_ref } | "ALL" | "GLOBAL"
-partition_ref = [ "NOT" ] string
+namespace      = namespace_item { "," namespace_item }
+namespace_item = namespace_ref | "ALL" | "GLOBAL"
+namespace_ref  = [ "NOT" ] string
 
 anchor      = string | vector
 anchor_list = "[" anchor { "," anchor } "]" | anchor
@@ -24,7 +25,7 @@ duration    = integer ( "s" | "m" | "h" | "d" | "w" )
 
 Operator precedence: NOT (tightest) > AND > OR (loosest).
 
-All reserved words are case-insensitive: `MATCH AND OR NOT DISTANCE DIRECTION CONTRAST ATTRACT REPEL WITHIN TOP CONE WINDOW PARTITION ALL GLOBAL LIMIT`.
+All reserved words are case-insensitive: `MATCH AND OR NOT DISTANCE DIRECTION CONTRAST ATTRACT REPEL WITHIN TOP CONE WINDOW NAMESPACE ALL GLOBAL LIMIT`.
 
 ## Clauses
 
@@ -33,14 +34,16 @@ All reserved words are case-insensitive: `MATCH AND OR NOT DISTANCE DIRECTION CO
 | Field | Type | Required | Default | Range |
 |---|---|---|---|---|
 | `anchor` | string or float[] | yes | — | — |
-| `within` | number | no | — | 0.0–2.0 (cosine distance) |
+| `within` | number | no | — | 0.0–1.0 (cosine similarity floor; 0 = no floor) |
 | `top_k` | integer | no | — | ≥1 |
 | `metric` | string | no | `"cosine"` | `"cosine"`, `"euclidean"`, `"dot"` |
 
+`within` is a minimum similarity floor — a match passes when its cosine similarity to the anchor is at least `within`. Larger value = stricter neighbourhood.
+
 Cannot specify both `within` and `top_k`. If neither is set, the clause scores without thresholding.
 
-Text: `DISTANCE("payment failure") WITHIN 0.3`
-JSON: `{"distance": {"anchor": "payment failure", "within": 0.3}}`
+Text: `DISTANCE("payment failure") WITHIN 0.7`
+JSON: `{"distance": {"anchor": "payment failure", "within": 0.7}}`
 
 ### DIRECTION — cone in embedding space
 
@@ -59,13 +62,13 @@ JSON: `{"direction": {"toward": ["customer frustration", "billing"], "cone": 0.4
 | Field | Type | Required | Default | Range |
 |---|---|---|---|---|
 | `attract` | string[] | yes | — | ≥1 item |
-| `repel` | string[] | yes | — | ≥1 item |
-| `within` | number | no | — | 0.0–2.0 |
+| `repel` | string[] | no | — | ≥1 item |
+| `within` | number | no | — | 0.0–1.0 (cosine similarity floor from composite vector; 0 = no floor) |
 
-Composite vector: `normalize(mean(embed(attract)) - mean(embed(repel)))`.
+Composite vector: `normalize(mean(embed(attract)) - mean(embed(repel)))` when `repel` is present; `normalize(mean(embed(attract)))` otherwise.
 
-Text: `CONTRAST(ATTRACT ["enterprise"], REPEL ["free tier"]) WITHIN 0.4`
-JSON: `{"contrast": {"attract": ["enterprise"], "repel": ["free tier"], "within": 0.4}}`
+Text: `CONTRAST(ATTRACT ["enterprise"], REPEL ["free tier"]) WITHIN 0.6`
+JSON: `{"contrast": {"attract": ["enterprise"], "repel": ["free tier"], "within": 0.6}}`
 
 ## Expressions (JSON)
 
@@ -78,17 +81,18 @@ JSON: `{"contrast": {"attract": ["enterprise"], "repel": ["free tier"], "within"
 
 `and` and `or` require ≥2 items. `not` takes exactly one expression.
 
-## Partition Selector (JSON)
+## Namespace Selector (JSON)
 
 ```json
 {
-  "include": ["org:acme-corp", "org:acme-*"],
-  "exclude": ["org:acme-staging"],
-  "global": true
+  "include": ["monsters"],
+  "exclude": ["monsters-staging"],
+  "global": true,
+  "all": false
 }
 ```
 
-Supports glob patterns (`*`, `?`). `global: true` includes the global partition.
+Namespace names are matched literally — no wildcards. `global: true` includes the global namespace; `all: true` includes every namespace the caller has access to. The text-form keywords `GLOBAL` and `ALL` map to those booleans and may appear alongside literal names in the comma-separated list (e.g. `NAMESPACE "monsters", GLOBAL`).
 
 ## Duration
 
@@ -100,14 +104,10 @@ JSON: ISO 8601 — `"PT30S"`, `"PT15M"`, `"PT24H"`, `"P7D"`, `"P28D"`.
 ```json
 {
   "match": <expression>,
-  "partition": <partition_selector>,
+  "namespace": <namespace_selector>,
   "window": "<ISO 8601 duration>",
   "limit": <integer>
 }
 ```
 
 Only `match` is required.
-
-## Future work (NOT in v1.0)
-
-Trajectory, Region, Anomaly, Resonance clauses. Named references (`$var`, `MSG()`, `CENTROID()`). Composite anchors. Clause weights.

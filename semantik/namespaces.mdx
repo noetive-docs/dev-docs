@@ -19,11 +19,11 @@ The table shows the new namespace alongside its auto-assigned **namespace ID**. 
 
 ## Using a namespace ID
 
-Reference a namespace in SemQL via the `PARTITION` clause:
+Reference a namespace in SemQL via the `NAMESPACE` clause:
 
 ```sql
-MATCH DISTANCE("payment failure") WITHIN 0.3
-PARTITION "your-namespace-id"
+MATCH DISTANCE("payment failure") WITHIN 0.8
+NAMESPACE "your-namespace-id"
 LIMIT 20
 ```
 
@@ -31,10 +31,10 @@ You can target multiple namespaces or combine with `GLOBAL`:
 
 ```sql
 MATCH DIRECTION(["outage", "service degradation"]) CONE 0.4
-PARTITION "ns-prod", "ns-staging", GLOBAL
+NAMESPACE "ns-prod", "ns-staging", GLOBAL
 ```
 
-See [SemQL query language](/semantik/query-language) for the full partition selector syntax.
+See [SemQL query language](/semantik/query-language) for the full namespace selector syntax.
 
 ## Editing a namespace
 

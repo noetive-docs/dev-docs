@@ -18,7 +18,7 @@ A query has one required clause and three optional modifiers:
 
 ```sql
 MATCH <expression>
-[ PARTITION <partition_selector> ]
+[ NAMESPACE <namespace_selector> ]
 [ WINDOW <duration> ]
 [ LIMIT <integer> ]
 ```
@@ -27,21 +27,21 @@ MATCH <expression>
 
 ### DISTANCE
 
-Nearest-neighbor sphere in embedding space. Matches messages whose embedding falls within a given cosine distance of the anchor.
+Nearest-neighbor sphere in embedding space. Matches messages whose embedding is at least as similar to the anchor as the `within` floor you set.
 
 <CodeGroup>
 ```sql SemQL
-MATCH DISTANCE("payment reconciliation failure") WITHIN 0.3
-PARTITION "org:acme-corp"
+MATCH DISTANCE("payment reconciliation failure") WITHIN 0.8
+NAMESPACE "org:acme-corp"
 LIMIT 20
 ```
 
 ```json JSON
 {
   "match": {
-    "distance": { "anchor": "payment reconciliation failure", "within": 0.3 }
+    "distance": { "anchor": "payment reconciliation failure", "within": 0.8 }
   },
-  "partition": { "include": ["org:acme-corp"] },
+  "namespace": { "include": ["org:acme-corp"] },
   "limit": 20
 }
 ```
@@ -50,9 +50,13 @@ LIMIT 20
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `anchor` | string \| float[] | yes | — | Center point — natural language text or raw embedding vector |
-| `within` | number | no | — | Maximum cosine distance (0.0–2.0) |
+| `within` | number | no | — | Minimum cosine similarity (0.0–1.0); 0 means no floor |
 | `top_k` | integer | no | — | Return top-k nearest neighbors |
 | `metric` | string | no | `"cosine"` | Distance metric: `"cosine"`, `"euclidean"`, or `"dot"` |
+
+<Note>
+`within` is a **similarity floor, not a distance ceiling**. A message matches when its similarity to the anchor is at least `within`, so a **higher value is stricter**. `WITHIN 0.9` is near-exact; `WITHIN 0.3` lets almost everything through. Values above 1.0 are rejected.
+</Note>
 
 Provide either `within` or `top_k`. If neither is set, the clause acts as a scoring signal without a hard threshold.
 
@@ -65,7 +69,7 @@ Cone search in embedding space. Matches messages aligned with one or more concep
 <CodeGroup>
 ```sql SemQL
 MATCH DIRECTION(["customer frustration", "billing complaint"]) CONE 0.4
-PARTITION "org:acme-corp"
+NAMESPACE "org:acme-corp"
 ```
 
 ```json JSON
@@ -76,7 +80,7 @@ PARTITION "org:acme-corp"
       "cone": 0.4
     }
   },
-  "partition": { "include": ["org:acme-corp"] }
+  "namespace": { "include": ["org:acme-corp"] }
 }
 ```
 </CodeGroup>
@@ -100,8 +104,8 @@ MATCH CONTRAST(
   ATTRACT ["enterprise", "high-value account"],
   REPEL   ["self-serve", "free tier"]
 )
-WITHIN 0.4
-PARTITION "org:acme-corp"
+WITHIN 0.7
+NAMESPACE "org:acme-corp"
 ```
 
 ```json JSON
@@ -110,10 +114,10 @@ PARTITION "org:acme-corp"
     "contrast": {
       "attract": ["enterprise", "high-value account"],
       "repel": ["self-serve", "free tier"],
-      "within": 0.4
+      "within": 0.7
     }
   },
-  "partition": { "include": ["org:acme-corp"] }
+  "namespace": { "include": ["org:acme-corp"] }
 }
 ```
 </CodeGroup>
@@ -122,7 +126,7 @@ PARTITION "org:acme-corp"
 |-------|------|----------|---------|-------------|
 | `attract` | string[] | yes | — | Concepts to attract toward |
 | `repel` | string[] | yes | — | Concepts to repel from |
-| `within` | number | no | — | Max distance from the composite vector |
+| `within` | number | no | — | Minimum cosine similarity to the composite vector (0.0–1.0); 0 means no floor |
 
 The composite vector is `normalize(mean(embed(attract)) − mean(embed(repel)))`.
 
@@ -134,14 +138,14 @@ Combine clauses with `AND`, `OR`, and `NOT`. Use parentheses to control preceden
 
 ```sql
 MATCH DIRECTION("payment gateway") CONE 0.3
-  AND DISTANCE("timeout error") WITHIN 0.2
-PARTITION "org:acme-corp"
+  AND DISTANCE("timeout error") WITHIN 0.8
+NAMESPACE "org:acme-corp"
 ```
 
 ```sql
 MATCH (
     DIRECTION("infrastructure") CONE 0.3
-  AND DISTANCE("connection failure") WITHIN 0.2
+  AND DISTANCE("connection failure") WITHIN 0.8
 )
 OR (
     DIRECTION("database") CONE 0.3
@@ -150,35 +154,37 @@ OR (
       REPEL   ["query optimization"]
     )
 )
-PARTITION "org:acme-corp"
+NAMESPACE "org:acme-corp"
 ```
 
 ```sql
 MATCH DIRECTION("infrastructure security") CONE 0.3
-  AND NOT DISTANCE("routine monitoring") WITHIN 0.2
+  AND NOT DISTANCE("routine monitoring") WITHIN 0.75
 ```
 
 ---
 
 ## Modifiers
 
-### PARTITION
+### NAMESPACE
 
-Scopes the query to one or more namespaces. Without a `PARTITION` clause, the query searches the default namespace only.
+Scopes the query to one or more namespaces. Without a `NAMESPACE` clause, the query searches the default namespace only.
+
+Namespace names match exactly — wildcards are not supported. List each namespace you want, and use `NOT` to exclude one from a broader scope.
 
 <CodeGroup>
 ```sql SemQL
-PARTITION "org:acme-corp"                         -- single namespace
-PARTITION "org:acme-corp", "org:acme-staging"     -- multiple
-PARTITION "org:acme-*"                            -- glob pattern
-PARTITION "org:acme-*", NOT "org:acme-internal"   -- exclusion
-PARTITION ALL                                     -- all accessible namespaces
-PARTITION GLOBAL                                  -- global shared namespace
+NAMESPACE "org:acme-corp"                            -- single namespace
+NAMESPACE "org:acme-corp", "org:acme-staging"        -- multiple
+NAMESPACE ALL, NOT "org:acme-internal"               -- everything but one
+NAMESPACE ALL                                        -- all accessible namespaces
+NAMESPACE GLOBAL                                     -- global shared namespace
+NAMESPACE "org:acme-corp", GLOBAL                    -- own namespace plus global
 ```
 
 ```json JSON
 {
-  "include": ["org:acme-corp", "org:acme-*"],
+  "include": ["org:acme-corp", "org:acme-staging"],
   "exclude": ["org:acme-internal"],
   "global": true
 }
@@ -248,7 +254,7 @@ MATCH DIRECTION(["sovereign debt concern", "emerging market stress"]) CONE 0.4
         ATTRACT ["credit spreads", "bond yields"],
         REPEL   ["routine monetary policy", "scheduled rate decision"]
       )
-PARTITION "org:hedgefund", GLOBAL
+NAMESPACE "org:hedgefund", GLOBAL
 ```
 
 ```json Finance: risk signal detection (JSON)
@@ -269,7 +275,7 @@ PARTITION "org:hedgefund", GLOBAL
       }
     ]
   },
-  "partition": { "include": ["org:hedgefund"], "global": true }
+  "namespace": { "include": ["org:hedgefund"], "global": true }
 }
 ```
 </CodeGroup>
@@ -281,7 +287,7 @@ MATCH DIRECTION(["unmet need", "product frustration"]) CONE 0.4
         ATTRACT ["home kitchen", "small appliance"],
         REPEL   ["professional equipment", "commercial grade"]
       )
-PARTITION "org:retailco-*", NOT "org:retailco-internal"
+NAMESPACE "org:retailco-eu", "org:retailco-us", NOT "org:retailco-internal"
 WINDOW 30d
 ```
 
@@ -303,8 +309,8 @@ WINDOW 30d
       }
     ]
   },
-  "partition": {
-    "include": ["org:retailco-*"],
+  "namespace": {
+    "include": ["org:retailco-eu", "org:retailco-us"],
     "exclude": ["org:retailco-internal"]
   },
   "window": "P30D"
@@ -318,7 +324,7 @@ WINDOW 30d
 
 ```
 MATCH AND OR NOT DISTANCE DIRECTION CONTRAST ATTRACT REPEL
-WITHIN TOP CONE WINDOW PARTITION ALL GLOBAL LIMIT
+WITHIN TOP CONE WINDOW NAMESPACE ALL GLOBAL LIMIT
 ```
 
 Reserved words are case-insensitive in text syntax. JSON uses lowercase keys exclusively.
@@ -330,7 +336,7 @@ Reserved words are case-insensitive in text syntax. JSON uses lowercase keys exc
 <Accordion title="EBNF grammar">
 ```ebnf
 query            = match_clause
-                   [ partition_clause ]
+                   [ namespace_clause ]
                    [ window_clause ]
                    [ limit_clause ] ;
 
@@ -356,11 +362,10 @@ contrast_clause  = "CONTRAST" "("
                      "REPEL"   anchor_list
                    ")" [ "WITHIN" number ] ;
 
-partition_clause  = "PARTITION" partition_selector ;
-partition_selector = partition_ref { "," partition_ref }
-                   | "ALL"
-                   | "GLOBAL" ;
-partition_ref     = [ "NOT" ] ( string_literal | glob_pattern ) ;
+namespace_clause  = "NAMESPACE" namespace_selector ;
+namespace_selector = namespace_item { "," namespace_item } ;
+namespace_item    = namespace_ref | "ALL" | "GLOBAL" ;
+namespace_ref     = [ "NOT" ] string_literal ;
 
 window_clause     = "WINDOW" duration ;
 limit_clause      = "LIMIT" integer ;
@@ -369,7 +374,6 @@ anchor            = string_literal | vector_literal ;
 anchor_list       = "[" anchor { "," anchor } "]" | anchor ;
 vector_literal    = "[" number { "," number } "]" ;
 string_literal    = '"' { character } '"' ;
-glob_pattern      = string_literal ;
 duration          = integer time_unit ;
 time_unit         = "s" | "m" | "h" | "d" | "w" ;
 number            = float | integer ;

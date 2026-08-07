@@ -12,7 +12,7 @@ MATCH DIRECTION("customer onboarding") CONE 0.4
         ATTRACT ["friction", "confusion", "drop-off", "abandoned"],
         REPEL   ["success", "completed", "activated", "converted"]
       )
-PARTITION "org:saas-co"
+NAMESPACE "dinoco"
 ```
 
 Why it works: DIRECTION alone matches all onboarding content. CONTRAST carves out the failure/friction half of that space. Together they answer "onboarding problems."
@@ -22,12 +22,12 @@ Why it works: DIRECTION alone matches all onboarding content. CONTRAST carves ou
 Find a specific pattern while excluding common false positives. DISTANCE pins to the signal, NOT DISTANCE excludes the noise.
 
 ```sql
-MATCH DISTANCE("connection pool exhaustion under sustained load") WITHIN 0.3
-  AND NOT DISTANCE("connection pool configuration tutorial") WITHIN 0.25
-PARTITION "org:platform-team", GLOBAL
+MATCH DISTANCE("connection pool exhaustion under sustained load") WITHIN 0.7
+  AND NOT DISTANCE("connection pool configuration tutorial") WITHIN 0.75
+NAMESPACE "gusteau", GLOBAL
 ```
 
-Why it works: the specific signal and the tutorial content are semantically close (both about connection pools). Without the NOT clause, tutorials would match. The NOT carves out the tutorial neighborhood.
+Why it works: the specific signal and the tutorial content are semantically close (both about connection pools). The first DISTANCE keeps only messages similar to the signal (similarity floor 0.7). The NOT DISTANCE excludes anything that crosses the tutorial floor (0.75), carving out the tutorial neighbourhood.
 
 ### Pattern 3: Multi-Domain Surveillance
 
@@ -46,7 +46,7 @@ MATCH (
         DIRECTION("shipping fulfillment") CONE 0.3
     AND CONTRAST(ATTRACT ["delay", "lost package"], REPEL ["delivered", "on time"])
   )
-PARTITION "org:retailco-*"
+NAMESPACE "axiom"
 ```
 
 Why it works: a single broad query would be too noisy. Three targeted OR branches each have high precision in their domain while collectively providing broad coverage.
@@ -57,11 +57,11 @@ Start broad with DIRECTION, then refine with DISTANCE to focus on a specific man
 
 ```sql
 MATCH DIRECTION("infrastructure cost optimization") CONE 0.5
-  AND DISTANCE("right-sizing Kubernetes pod resource requests") WITHIN 0.35
-PARTITION GLOBAL
+  AND DISTANCE("right-sizing Kubernetes pod resource requests") WITHIN 0.65
+NAMESPACE GLOBAL
 ```
 
-Why it works: DIRECTION captures the broad topic at high recall. DISTANCE narrows to the specific technique. Messages about cost optimization that aren't about K8s pod sizing are excluded by the DISTANCE threshold, while the DIRECTION ensures we don't drift into unrelated K8s content.
+Why it works: DIRECTION captures the broad topic at high recall. DISTANCE narrows to the specific technique. Messages about cost optimization that don't clear the K8s pod-sizing similarity floor are dropped, while the DIRECTION ensures we don't drift into unrelated K8s content.
 
 ### Pattern 5: Concept Boundary
 
@@ -81,11 +81,11 @@ MATCH CONTRAST(
           "API documentation",
           "API design patterns"
         ]
-      ) WITHIN 0.35
-PARTITION "org:platform-team"
+      ) WITHIN 0.65
+NAMESPACE "gusteau"
 ```
 
-Why it works: "API rate limiting" is semantically close to many other API concepts. A bare DISTANCE query would match API auth, versioning, etc. The CONTRAST's repel list pushes the composite vector away from the general "API" cluster and toward the specific "rate limiting / throttling" subspace.
+Why it works: "API rate limiting" is semantically close to many other API concepts. A bare DISTANCE query would match API auth, versioning, etc. The CONTRAST's repel list pushes the composite vector away from the general "API" cluster and toward the specific "rate limiting / throttling" subspace, and the 0.65 floor keeps only candidates clearly aligned with the composite.
 
 ---
 
@@ -127,19 +127,19 @@ MATCH DIRECTION("performance optimization") CONE 0.3
       )
 ```
 
-### Anti-Pattern 3: DISTANCE with large radius (false sense of precision)
+### Anti-Pattern 3: DISTANCE with too-low `WITHIN` (false sense of precision)
 
 ```sql
--- BAD: within 0.6 is a huge region — almost anything matches
-MATCH DISTANCE("microservice architecture") WITHIN 0.6
+-- BAD: a 0.3 similarity floor lets almost anything through
+MATCH DISTANCE("microservice architecture") WITHIN 0.3
 ```
 
-**Problem:** Cosine distance 0.6 encompasses an enormous volume. This will match anything vaguely related to software architecture. The `WITHIN` gives a false sense that the query is filtered.
+**Problem:** `WITHIN` is a *minimum cosine-similarity floor*. A floor of 0.3 admits anything with even a weak alignment to the anchor — vast portions of the "software architecture" space pass the gate. The `WITHIN` clause is present but doing almost no filtering, giving a false sense that the query is constrained.
 
-**Fix:** Either tighten the radius or switch to DIRECTION:
+**Fix:** Either raise the floor or switch to DIRECTION:
 ```sql
--- Option A: tight radius for specific matching
-MATCH DISTANCE("microservice architecture") WITHIN 0.2
+-- Option A: high floor for specific matching
+MATCH DISTANCE("microservice architecture") WITHIN 0.8
 
 -- Option B: direction for topical matching + contrast for precision
 MATCH DIRECTION("microservice architecture") CONE 0.3
@@ -150,32 +150,32 @@ MATCH DIRECTION("microservice architecture") CONE 0.3
 
 ```sql
 -- CAUTION: NOT only negates the DISTANCE, not the entire expression
-MATCH NOT DISTANCE("routine alert") WITHIN 0.2
+MATCH NOT DISTANCE("routine alert") WITHIN 0.8
   AND DIRECTION("infrastructure") CONE 0.4
 ```
 
-This is equivalent to `(NOT DISTANCE(...)) AND DIRECTION(...)` — it matches everything about infrastructure that ISN'T a routine alert. This might be what you want, but make sure. If you want to negate the whole thing:
+This is equivalent to `(NOT DISTANCE(...)) AND DIRECTION(...)` — it matches everything about infrastructure that ISN'T close enough to a routine alert (similarity below 0.8). This might be what you want, but make sure. If you want to negate the whole thing:
 
 ```sql
 -- Negate the entire group:
-MATCH NOT (DISTANCE("routine alert") WITHIN 0.2 AND DIRECTION("infrastructure") CONE 0.4)
+MATCH NOT (DISTANCE("routine alert") WITHIN 0.8 AND DIRECTION("infrastructure") CONE 0.4)
 ```
 
-### Anti-Pattern 5: Using partition as a semantic filter
+### Anti-Pattern 5: Using namespace as a semantic filter
 
 ```sql
--- BAD: partitions are access boundaries, not topic labels
+-- BAD: namespaces are access boundaries, not topic labels
 MATCH DISTANCE("bug report")
-PARTITION "topic:frontend-bugs"
+NAMESPACE "topic:frontend-bugs"
 ```
 
-**Problem:** Partitions are organizational isolation boundaries (org, team, session), not semantic categories. There is no `topic:` partition scheme.
+**Problem:** Namespaces are organizational isolation boundaries (org, team, session), not semantic categories. There is no `topic:` namespace scheme.
 
 **Fix:** Use clauses for semantic narrowing:
 ```sql
-MATCH DISTANCE("bug report") WITHIN 0.3
+MATCH DISTANCE("bug report") WITHIN 0.7
   AND DIRECTION("frontend rendering") CONE 0.3
-PARTITION "org:acme-corp"
+NAMESPACE "monsters"
 ```
 
 ---
@@ -190,8 +190,8 @@ MATCH DIRECTION(["security vulnerability", "exploit", "unauthorized access"]) CO
         ATTRACT ["production", "critical", "customer-facing"],
         REPEL   ["test environment", "CTF", "educational", "training exercise"]
       )
-  AND NOT DISTANCE("routine security scan results") WITHIN 0.2
-PARTITION "org:{{org}}", GLOBAL
+  AND NOT DISTANCE("routine security scan results") WITHIN 0.8
+NAMESPACE "{{org}}", GLOBAL
 ```
 
 ### Customer Churn Signals
@@ -202,7 +202,7 @@ MATCH DIRECTION(["customer dissatisfaction", "cancellation intent"]) CONE 0.4
         ATTRACT ["enterprise", "high-value", "long-term customer"],
         REPEL   ["trial user", "free tier", "just browsing"]
       )
-PARTITION "org:{{org}}"
+NAMESPACE "{{org}}"
 WINDOW 7d
 ```
 
@@ -214,7 +214,7 @@ MATCH DIRECTION("technical debt") CONE 0.4
         ATTRACT ["workaround", "hack", "TODO", "known issue", "legacy"],
         REPEL   ["refactored", "cleaned up", "resolved", "migrated"]
       )
-PARTITION "org:{{org}}"
+NAMESPACE "{{org}}"
 ```
 
 ### Competitive Intelligence
@@ -225,7 +225,7 @@ MATCH DIRECTION(["competitor product launch", "market disruption"]) CONE 0.4
         ATTRACT ["{{competitor_name}}", "market share", "pricing change"],
         REPEL   ["{{own_company}}", "internal roadmap", "our product"]
       )
-PARTITION GLOBAL
+NAMESPACE GLOBAL
 ```
 
 ### Infrastructure Incident Correlation
@@ -239,6 +239,6 @@ MATCH (
         DIRECTION("service mesh failure") CONE 0.3
     AND CONTRAST(ATTRACT ["cascade", "circuit breaker", "retry storm"], REPEL ["deployment", "rollout"])
   )
-PARTITION "org:{{org}}"
+NAMESPACE "{{org}}"
 WINDOW 1h
 ```

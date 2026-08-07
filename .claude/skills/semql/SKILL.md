@@ -66,7 +66,7 @@ MATCH DIRECTION(["payment processing", "transaction"]) CONE 0.4
         ATTRACT ["failure", "error", "timeout"],
         REPEL   ["success", "completed", "processed"]
       )
-  AND DISTANCE("intermittent drops under load") WITHIN 0.35
+  AND DISTANCE("intermittent drops under load") WITHIN 0.65
 ```
 
 This says: thematically about payments (DIRECTION), specifically the failure/error side (CONTRAST), and close to the specific pattern of intermittent drops (DISTANCE). Each clause eliminates a different kind of noise.
@@ -85,37 +85,39 @@ MATCH (
 
 This watches for two distinct failure modes that might have the same downstream impact.
 
-### 3. Tune cone angles and distance thresholds
+### 3. Tune cone angles and similarity floors
 
 These numerical parameters control precision vs recall:
 
 | Parameter | Small value | Large value |
 |---|---|---|
 | `CONE` (radians) | Narrow focus (0.1–0.2), high precision | Broad sweep (0.5–0.8), high recall |
-| `WITHIN` (cosine distance) | Tight match (0.1–0.2), near-exact semantics | Loose match (0.4–0.6), general vicinity |
+| `WITHIN` (cosine similarity floor, 0–1) | Loose match (0.4–0.6), general vicinity | Tight match (0.8–0.9), near-exact semantics |
+
+`WITHIN` is a **minimum similarity floor**: a candidate passes when its cosine similarity to the anchor is at least the given value. Larger value = stricter neighbourhood. `WITHIN 0` means no floor (every score survives the per-clause gate).
 
 **Starting points for common use cases:**
 
-- Monitoring a specific known pattern: `CONE 0.2`, `WITHIN 0.25`
+- Monitoring a specific known pattern: `CONE 0.2`, `WITHIN 0.75`
 - Broad topical surveillance: `CONE 0.5`, no `WITHIN`
-- Duplicate/near-duplicate detection: `DISTANCE` only, `WITHIN 0.1`
-- Concept separation (like X not Y): `CONTRAST` with `WITHIN 0.3`
+- Duplicate/near-duplicate detection: `DISTANCE` only, `WITHIN 0.9`
+- Concept separation (like X not Y): `CONTRAST` with `WITHIN 0.7`
 
-### 4. Use PARTITION to control scope, not semantics
+### 4. Use NAMESPACE to control scope, not semantics
 
-Partitions are isolation boundaries, not semantic categories. Don't use partitions to narrow meaning — use clauses for that.
+Namespaces are isolation boundaries, not semantic categories. Don't use namespaces to narrow meaning — use clauses for that.
 
-**Wrong — using partition as a topic filter:**
+**Wrong — using namespace as a topic filter:**
 ```sql
 MATCH DISTANCE("connection timeout")
-PARTITION "topic:networking"       -- This is not how partitions work
+NAMESPACE "topic:networking"       -- This is not how namespaces work
 ```
 
-**Right — using partition as an access boundary:**
+**Right — using namespace as an access boundary:**
 ```sql
 MATCH DIRECTION("connection timeout") CONE 0.3
   AND CONTRAST(ATTRACT ["production"], REPEL ["test", "staging"])
-PARTITION "org:acme-corp", GLOBAL
+NAMESPACE "monsters", GLOBAL
 ```
 
 ### 5. Prefer text anchors over raw vectors
@@ -146,10 +148,10 @@ When a user describes what they want to monitor, follow this process:
 
 1. **Identify the core concept** — what topic or region of meaning are they interested in?
 2. **Identify exclusions** — what should NOT match? This becomes a CONTRAST repel or a NOT clause.
-3. **Identify scope** — which partitions, what time window, what volume limit?
+3. **Identify scope** — which namespaces, what time window, what volume limit?
 4. **Choose clause types** — map each aspect to the right geometric primitive.
 5. **Compose with AND/OR/NOT** — combine clauses to sculpt the region.
-6. **Set numerical parameters** — tune cone angles and distance thresholds.
+6. **Set numerical parameters** — tune cone angles and similarity floors.
 7. **Write both formats** — provide text and JSON.
 8. **Explain the query** — describe what each clause does and why it's there.
 
@@ -167,8 +169,8 @@ When writing SemQL, always structure your response as:
 Read `references/patterns.md` for the full catalog. The most frequent mistakes:
 
 - **DIRECTION without CONTRAST** — too broad, matches anything topically adjacent
-- **DISTANCE with too-large `within`** — >0.5 matches a huge region, probably not what they want
+- **DISTANCE with too-low `within`** — a floor <0.5 lets almost anything pass, giving a false sense the query is filtered
 - **CONTRAST with overlapping attract/repel** — concepts that are semantically close in both lists cancel out
-- **Missing PARTITION** — queries against the global partition when they meant org-private
+- **Missing NAMESPACE** — queries against the global namespace when they meant org-private
 - **NOT applied to the wrong level** — `NOT DISTANCE(x) AND DIRECTION(y)` negates only the distance, not both (operator precedence: NOT binds tighter than AND)
 - **Single-clause queries** — almost always too broad; suggest adding a second clause
