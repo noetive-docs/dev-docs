@@ -1,9 +1,11 @@
 ---
 title: "Metrics"
-description: "Definitions for all real-time Semantik metrics."
+description: "Definitions for every metric on the Semantik dashboard."
 ---
 
-Semantik exposes six metrics that reflect live broker activity. They are delivered via a server-sent events stream and displayed on the [Semantik dashboard](/references/semantik/dashboard).
+Semantik reports six metrics covering broker activity in your namespaces. They are delivered via a server-sent events stream and displayed on the [Semantik dashboard](/references/semantik/dashboard).
+
+Every window is a **count of what happened inside it**, not an average. A wider window therefore always reports at least as much as a narrower one.
 
 ## Metric definitions
 
@@ -13,9 +15,9 @@ Messages successfully published to the Semantik broker.
 
 | Window | Description |
 |--------|-------------|
-| /sec | Messages published in the last second |
-| /min | Messages published in the last minute |
-| /hr | Messages published in the last hour |
+| /5 min | Messages published in the last five minutes |
+| last hr | Messages published in the last hour |
+| last 24h | Messages published in the last 24 hours |
 
 ### Delivered
 
@@ -23,21 +25,29 @@ Messages matched by at least one active subscription and delivered to a subscrib
 
 | Window | Description |
 |--------|-------------|
-| /sec | Deliveries in the last second |
-| /min | Deliveries in the last minute |
-| /hr | Deliveries in the last hour |
+| /5 min | Deliveries in the last five minutes |
+| last hr | Deliveries in the last hour |
+| last 24h | Deliveries in the last 24 hours |
 
-A message is counted as delivered once per matching subscription. If two subscribers match the same message, it counts as two deliveries.
+A message counts as delivered once per matching subscription. Two subscribers matching the same message is two deliveries, so Delivered routinely exceeds Sent.
 
-### Bandwidth
+### Payload
 
-Total data transferred through the broker (publish + delivery payloads combined).
+Data accepted on the publish path, in bytes.
 
 | Window | Description |
 |--------|-------------|
-| /sec | Bytes transferred in the last second |
-| /min | Bytes transferred in the last minute |
-| /hr | Bytes transferred in the last hour |
+| /5 min | Bytes accepted in the last five minutes |
+| last hr | Bytes accepted in the last hour |
+| last 24h | Bytes accepted in the last 24 hours |
+
+Three things to know about what this counts:
+
+- It measures **message content plus its embedding**. Embeddings dominate for short messages, so the figure is larger than the text you published.
+- It covers **publishing only**. Search responses and subscribe streams are not counted.
+- A publish deduplicated by its idempotency key adds nothing, because no new data was accepted.
+
+This is data volume, not link throughput. It is reported in bytes (KB, MB, GB, TB), never in bits per second.
 
 ### Errors
 
@@ -45,21 +55,36 @@ Failed publish or delivery operations.
 
 | Window | Description |
 |--------|-------------|
-| /sec | Errors in the last second |
 | Today | Errors since midnight UTC |
-| This week | Errors in the current calendar week |
-| This month | Errors in the current calendar month |
+| last 7d | Errors in the last seven days |
+| last 31d | Errors in the last 31 days |
+
+`Today` is the only calendar-aligned window, and it resets at midnight UTC rather than in your local timezone. The other two are rolling: `last 7d` covers the preceding 168 hours, and `last 31d` covers the full retention period for metric history.
 
 ### Subscriptions
 
-The number of active SemQL subscriptions registered with the broker at this moment. Each unique subscription query from a connected agent counts as one subscription.
+Active SemQL subscriptions registered with the broker at this moment. Each unique subscription query from a connected agent counts as one.
 
 ### Subscribers
 
-The number of agents currently connected to the broker. An agent increments this count when it opens a connection and decrements it when it disconnects.
+Agents currently connected to the broker. An agent increments this count when it opens a connection and decrements it when it disconnects.
+
+Both are point-in-time readings rather than windows, so they show the state as of the last report.
+
+## Reading a quiet dashboard
+
+A window showing `0` means no activity in that window. It does not mean data is missing.
+
+Semantik reports nothing while a namespace is idle, so the dashboard shows a **Last reported** timestamp below the metrics. Use it to tell the two cases apart:
+
+- **Recent timestamp, zero windows** — everything is healthy and your agents are quiet.
+- **Old timestamp** — nothing has reported for a while. Check that your agents are connected.
+- **`never`** — this account has not reported yet. Publish a message to populate the dashboard.
+
+Dashes appear only in the `never` case.
 
 ## SSE stream
 
-Metric data is delivered via server-sent events at `GET /semantik/events`. Authentication is required. The stream emits updates on each broker tick and closes after 120 seconds of inactivity — clients should reconnect automatically.
+Metric data is delivered via server-sent events at `GET /semantik/events`. Authentication is required.
 
-The dashboard reconnects transparently; no manual action is needed.
+The stream sends a metrics event whenever fresh data arrives, and a heartbeat comment between updates so intermediate proxies do not close an idle connection. Clients should reconnect automatically if the connection drops; the dashboard does this transparently.

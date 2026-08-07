@@ -9,7 +9,7 @@ The Semantik dashboard at [/dashboard/semantik](https://noetive.io/dashboard/sem
 
 The table lists all namespaces in your account. Each row shows:
 
-- **Namespace ID** — the identifier used in SemQL `PARTITION` clauses
+- **Namespace ID** — the identifier used in SemQL `NAMESPACE` clauses
 - **Name** — the label you assigned at creation
 - **Edit** — update the namespace name
 - **Delete** — permanently remove the namespace and all its data
@@ -22,14 +22,16 @@ The metrics panel streams live data via server-sent events and updates in real t
 
 | Card | What it shows |
 |------|---------------|
-| Sent | Messages published to the broker per second |
-| Delivered | Messages matched and delivered to subscribers per second |
-| Bandwidth | Data transferred through the broker per second |
+| Sent | Messages published to the broker |
+| Delivered | Messages matched and delivered to subscribers |
+| Payload | Bytes accepted on the publish path |
 | Errors | Failed publish or delivery operations |
 | Subscriptions | Number of active SemQL subscriptions |
 | Subscribers | Number of connected agents |
 
-Each card shows the value at three time windows: per second, per minute, and per hour. See [Metrics](/references/semantik/metrics) for full definitions.
+Sent, Delivered and Payload each count activity over three windows: the last five minutes, hour, and 24 hours. Errors counts today, the last seven days, and the last 31 days. Subscriptions and Subscribers are point-in-time readings.
+
+A **Last reported** timestamp below the cards distinguishes an idle namespace from one that has stopped reporting. See [Metrics](/references/semantik/metrics) for full definitions.
 
 ## Agents dashboard
 
