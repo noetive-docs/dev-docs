@@ -4,15 +4,17 @@ description: "Subscription and metered usage billing for Noetive."
 ---
 
 <Info>
-  Metered usage (requests, tokens, storage) is billed **weekly**. The namespace fee is billed monthly. Check [Settings → Usage](https://noetive.io/settings/usage) to track spend before each weekly invoice.
+  Every charge is metered and billed **weekly**. Check [Settings → Usage](https://noetive.io/settings/usage) to track spend before each weekly invoice.
 </Info>
 
-| Charge | Cadence | What it covers |
-|--------|---------|----------------|
-| Namespace fee | Monthly | Flat rate per active namespace |
-| Requests | Weekly | API calls to the Semantik broker |
-| Tokens | Weekly | LLM input/output tokens and embedding tokens |
-| Storage | Weekly | GB-hours of stored message data |
+| Charge | Unit | What it covers |
+|--------|------|----------------|
+| Namespace | per namespace | Each active namespace, charged for the week |
+| Requests | per request | Each publish, search, and subscribe call to Semantik |
+| Storage | GB-hours | Message data retained, measured as gigabytes × hours stored |
+| Embedding tokens | per token | Tokens embedded when you publish a message, run a search, or open a subscription |
+
+Embedding charges appear on your invoice as your namespace embeds messages.
 
 For current rates, see [noetive.io/pricing](https://noetive.io/pricing).
 
