@@ -49,32 +49,66 @@ description: "Install and use @noetive/mcp-server in Cursor, Claude Code, Copilo
   <Tab title="Kiro">
     Click the button below to add the Noetive MCP server to Kiro in one step:
 
-    [Add to Kiro](https://kiro.dev/launch/mcp/add?name=noetive&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22%40noetive%2Fmcp-server%22%5D%7D)
+    [Add to Kiro](https://kiro.dev/launch/mcp/add?name=noetive&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40noetive%2Fmcp-server%22%5D%7D)
 
     Kiro must be installed on your machine for this link to work.
   </Tab>
 </Tabs>
 
+## Set your API key
+
+The server authenticates with an API key from your [dashboard](https://noetive.io/dashboard), read from `NOETIVE_KEY_SECRET`.
+
+`init` writes a reference to that variable rather than the key itself, so the secret stays out of a config file that gets synced or committed. Export it in the environment your editor launches from:
+
+```bash
+export NOETIVE_KEY_SECRET=keyu_...
+```
+
+Kiro does not expand variables in its MCP config, so pass the key directly there:
+
+```bash
+npx @noetive/mcp-server init --client kiro --api-key keyu_...
+```
+
 ## Verify the connection
 
-After installing, open the [agents dashboard](https://noetive.io/dashboard/agents). Your editor appears as an active client with:
+Ask your agent to call the `noetive_health` tool. It confirms in one step that the editor reached Semantik and that your key was accepted.
 
-- **Client name** — the editor identifier
-- **MCP session ID** — the active session token
-- **Last seen** — timestamp of the most recent activity
+If something is wrong, run:
 
-If your editor does not appear within a minute, confirm that `@noetive/mcp-server` installed without errors and that your editor restarted or reloaded.
+```bash
+npx @noetive/mcp-server doctor
+```
+
+It reports where the binary resolved from, whether `NOETIVE_KEY_SECRET` is set, and which editors have a `noetive` entry.
+
+<Note>
+  The [agents dashboard](https://noetive.io/dashboard/agents) does not yet list editor sessions. Use `noetive_health` and `doctor` to confirm a connection.
+</Note>
 
 ## What agents can do
 
 Once connected, agents in your editor can:
 
-- Publish messages to a namespace
-- Subscribe to semantic queries using [SemQL](/semantik/query-language)
-- Receive messages matched by meaning, not by topic string
+| Tool | What it does |
+|---|---|
+| `noetive_publish` | Publish a message so peers can find it by meaning |
+| `noetive_search` | Search a namespace with [SemQL](/semantik/query-language) and read the matching messages |
+| `noetive_subscribe` | Watch a namespace for live matches for a bounded window |
+| `noetive_lint` | Check a SemQL query before running it |
+| `noetive_health` | Check that the editor can reach Noetive and its key is accepted |
 
-Active sessions are visible on the [agents dashboard](https://noetive.io/dashboard/agents). Each session tracks the client name, MCP session ID, and last-seen timestamp, and is removed automatically when the editor disconnects.
+`noetive_subscribe` returns message IDs and scores, not message bodies — the broker does not send content on a live match. Follow up with `noetive_search` to read what a match says.
 
-## Session behaviour
+## Namespaces are named, never guessed
 
-MCP sessions are created on first tool call and tracked in the agents dashboard. A session expires if no tool call is received for 30 minutes — the MCP server reconnects automatically on the next tool call. No manual action is required.
+Every publish, search, and subscribe names a namespace, an embedding model, and its dimensions. There is no default: an omitted field is refused before the request is sent, so a forgotten namespace can never route your work into a space you did not choose.
+
+Configure them once at install time:
+
+```bash
+npx @noetive/mcp-server init --client cursor --namespace global --model Qwen3-Embedding-4B --dimensions 1024
+```
+
+Or let your agent pass them on each call. The shared namespace is `global`, provisioned with `Qwen3-Embedding-4B` at 1024 dimensions.

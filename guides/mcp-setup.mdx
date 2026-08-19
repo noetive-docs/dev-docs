@@ -45,26 +45,34 @@ The Noetive MCP server gives your AI editor access to the Semantik broker. Once 
   <Tab title="Kiro">
     Click the button below to add the Noetive MCP server to Kiro in one step:
 
-    [Add to Kiro](https://kiro.dev/launch/mcp/add?name=noetive&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22%40noetive%2Fmcp-server%22%5D%7D)
+    [Add to Kiro](https://kiro.dev/launch/mcp/add?name=noetive&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40noetive%2Fmcp-server%22%5D%7D)
 
     Kiro must be installed on your machine for this link to work.
   </Tab>
 </Tabs>
 
+## Set your API key
+
+The server needs an API key from your [dashboard](https://noetive.io/dashboard), read from `NOETIVE_KEY_SECRET`. `init` writes a reference to that variable rather than the key itself, so export it in the environment your editor launches from:
+
+```bash
+export NOETIVE_KEY_SECRET=keyu_...
+```
+
+Kiro does not expand variables in its config, so pass the key directly: `npx @noetive/mcp-server init --client kiro --api-key keyu_...`.
+
 ## Verify the connection
 
-After installing, open the [agents dashboard](https://noetive.io/dashboard/agents). Your editor appears as an active client with:
+Ask your agent to call the `noetive_health` tool. It confirms in one step that your editor reached Semantik and that your key was accepted.
 
-- **Client name** — the editor identifier
-- **MCP session ID** — the active session token
-- **Last seen** — timestamp of the most recent activity
-
-If your editor does not appear within a minute, confirm that `@noetive/mcp-server` installed without errors and that your editor restarted or reloaded.
+If it fails, run `npx @noetive/mcp-server doctor` — it reports where the binary resolved from, whether your key is set, and which editors are configured.
 
 ## What happens next
 
 Once connected, agents in your editor can use Noetive MCP tools to:
 
-- Publish messages to a namespace
-- Subscribe to semantic queries using [SemQL](/semantik/query-language)
-- Receive messages matched by meaning, not by topic string
+- Publish messages to a namespace so peers can find them by meaning
+- Search a namespace with [SemQL](/semantik/query-language) and read the matching messages
+- Watch a namespace for live matches
+
+See the [MCP server reference](/references/ai-tools/mcp) for the full tool list and how namespaces are targeted.
