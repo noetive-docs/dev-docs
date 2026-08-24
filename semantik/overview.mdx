@@ -1,33 +1,45 @@
 ---
 title: "Semantik"
-description: "A semantic message broker for agent cooperation."
+description: "A semantic message broker: publish messages, subscribe by meaning, receive matches live."
+keywords: ["semantic kernel", "microsoft semantic kernel", "semantic router"]
 ---
 
-## Get started
+Semantik delivers messages by meaning rather than by topic name. A publisher sends a message and names no recipients. A subscriber describes the region of meaning it cares about in SemQL, and every message that lands in that region arrives on its stream.
 
-<Steps>
-  <Step title="Create a namespace">
-    Go to the [Semantik dashboard](https://noetive.io/dashboard/semantik) and create your first namespace.
-  </Step>
-  <Step title="Install the MCP server">
-    Run `npx @noetive/mcp-server init --client <editor>` to connect your editor. See [MCP server](/references/ai-tools/mcp).
-  </Step>
-  <Step title="Write a subscription">
-    Use [SemQL](/semantik/query-language) to declare what your agent cares about. Semantik delivers matching messages as they arrive.
-  </Step>
-</Steps>
+## The four calls
+
+| Call | What it is for |
+|---|---|
+| `POST /v1/publish` | Send a message into a namespace |
+| `POST /v1/search` | Ask what already matches a meaning |
+| `POST /v1/subscribe` | Ask to be told when something matches, on a live stream |
+| `POST /v1/lint` | Check a SemQL query, no API key required |
+
+Run all four in order in the [Quickstart](/guides/quickstart), or see [which capability fits which problem](/guides/choose-a-capability).
 
 ## How it works
 
-Semantik routes messages by meaning. When an agent publishes a message, Semantik embeds its content into a high-dimensional vector and matches it against all active subscriptions. Each subscription is a SemQL query — a geometric predicate like "near payment failure" or "aligned with infrastructure degradation but not routine maintenance." Matching subscribers receive the message.
+When an agent publishes a message, Semantik embeds its content into a vector and matches it against every active subscription. Each subscription is a SemQL query, a geometric predicate like "near payment failure" or "aligned with infrastructure degradation but not routine maintenance". Every subscriber whose predicate the message satisfies receives it, in the same moment, whether or not the publisher knew that subscriber existed.
+
+One publish can match many subscriptions, and each match is delivered separately. Delivery is at-least-once, so dedupe on `message_id`.
 
 ## Core concepts
 
 <CardGroup cols={2}>
   <Card title="Namespaces" icon="folder-open" href="/semantik/namespaces">
-    Isolated message scopes. Each namespace holds its own messages, subscriptions, and metrics independently.
+    Isolated message scopes, each pinned to one embedding model and dimension count.
   </Card>
   <Card title="SemQL" icon="code" href="/semantik/query-language">
-    The query language for expressing subscriptions as geometric predicates over embedding space.
+    The query language for expressing interest as a predicate over embedding space.
+  </Card>
+  <Card title="Publish and subscribe" icon="tower-broadcast" href="/guides/choose-a-capability">
+    When to stand up a subscription, and what a match frame carries.
+  </Card>
+  <Card title="Search" icon="magnifying-glass" href="/guides/quickstart">
+    The same query language, run once against what is already stored.
   </Card>
 </CardGroup>
+
+## Semantik and Microsoft Semantic Kernel
+
+<Snippet file="not-semantic-kernel.mdx" />

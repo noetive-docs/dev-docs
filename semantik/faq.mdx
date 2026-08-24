@@ -1,0 +1,45 @@
+---
+title: "FAQ"
+description: "What Semantik is, what it is not, and the questions that come up in the first hour."
+keywords: ["semantic kernel", "microsoft semantic kernel", "semantic router", "vector database", "kafka"]
+---
+
+## Is this Microsoft Semantic Kernel, or semantic-router?
+
+<Snippet file="not-semantic-kernel.mdx" />
+
+## Is Semantik a vector database?
+
+No. Semantik stores messages and matches them by meaning, and `POST /v1/search` will retrieve them, but the design point is delivery rather than retrieval. A vector database is built to hold a large corpus and answer queries against it on demand. Semantik is built to match every incoming message against every live subscription and push the matches out.
+
+If your job is retrieval over a document corpus, use a vector database. If your job is knowing early, use a subscription. Systems that need both usually run both.
+
+## Is it Kafka with vectors bolted on?
+
+No, and the difference is which side names the routing.
+
+In Kafka, NATS and Redis, the publisher picks a topic name and the subscriber picks the same name or a pattern. Delivery happens when the two strings match. In Semantik, the publisher names nothing, and the subscriber supplies a predicate over meaning. Delivery happens when a message lands in the region the predicate describes.
+
+That also means Semantik does not replace a topic broker. It offers no ordering guarantee, no consumer groups and no offset replay, and a topic broker will move raw volume more cheaply. Use a topic broker for volume with a known taxonomy, and Semantik where the taxonomy is the thing you do not have.
+
+## Do I have to compute embeddings myself?
+
+No. Publish text and Semantik embeds it using the model the namespace is pinned to. There is no embedder to run and no vector to compute.
+
+You can supply a vector instead of text when you want to control the embedding yourself. In that case it must match the namespace's model and dimension count.
+
+## Can I get exactly-once delivery?
+
+No. Delivery is at-least-once, so a consumer can see the same message twice. Dedupe on `message_id`, which is stable across redeliveries.
+
+On the publishing side, `idempotency_key` gives you the same protection: sending the same key twice within the retry window returns the original `message_id` rather than creating a second message.
+
+## Why must I name a model and dimensions on every call?
+
+Because a namespace is identified by the triple of its name, its embedding model, and its dimension count, not by its name alone. One name can carry several embedding configurations, and vectors from different models are not comparable, so guessing would silently return results computed in the wrong space.
+
+The shared `global` namespace is enabled for `Qwen3-Embedding-4B` at 1024 dimensions. Other combinations under that name are not provisioned and will be refused.
+
+## Can I pass the namespace ID from the dashboard?
+
+No. The wire field and the SemQL `NAMESPACE` clause both take the namespace **name**. An internal `ns_...` identifier is rejected with a message telling you to use an alias. See [Namespaces](/semantik/namespaces).

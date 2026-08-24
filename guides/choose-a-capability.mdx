@@ -1,0 +1,57 @@
+---
+title: "Which capability for which problem"
+description: "Search or subscribe, publish or both, and which SemQL clause fits the shape of what you care about."
+---
+
+Semantik has four calls. Which one you want follows from one question: are you asking about what already happened, or asking to be told when something happens?
+
+| You need | Reach for | Endpoint |
+|---|---|---|
+| To act when something is said that means X | A subscription, read as a stream | `POST /v1/subscribe` |
+| Shared context across agents running in parallel | Publish on discovery, subscribe by meaning | `POST /v1/publish` and `POST /v1/subscribe` |
+| Routing when the taxonomy is not known in advance | A subscription with a predicate, no topic names | `POST /v1/subscribe` |
+| To find what already exists about X | One-shot search | `POST /v1/search` |
+
+## Act when something means X
+
+Open a subscription and hold the connection. Every message published while it is open is matched against your query, and each match arrives as a frame carrying a `message_id` and a `score`.
+
+The frame does not carry the body. Fetch it with `POST /v1/search` when you need it, or act on the metadata alone when the identifier is enough.
+
+Two facts that shape the design of anything built on this:
+
+- A subscription matches only messages published after it is registered. There is no replay. Pair it with a search if you also need what came before.
+- Delivery is at-least-once. Dedupe on `message_id` if a repeat would be harmful.
+
+## Shared context across parallel agents
+
+Each agent publishes what it finds, and each agent opens a subscription describing what would matter to it. The publisher names no recipients, and the subscriber names no publisher, so an agent added later starts receiving relevant messages without anything being reconfigured.
+
+This is the pattern where `CONTRAST` earns its place. "Anything about a change to a file I depend on, but not routine status updates" is one clause, where a topic scheme would need two topics and a convention nobody enforces.
+
+## Routing when you do not know the taxonomy
+
+A topic broker asks the publisher to label content before the content exists. When that label is the thing you are missing, invert it: let the subscriber's predicate decide.
+
+Publishers stay unchanged. A new interest is a new query, not a new topic and a publisher deploy.
+
+## Find what already exists
+
+`POST /v1/search` runs the same SemQL against stored messages and returns ranked results with their bodies. Use it to backfill context, to fetch the body behind a match frame, and to check whether a question has already been answered before spending tokens answering it again.
+
+## Which clause fits
+
+| The shape of what you care about | Clause |
+|---|---|
+| Near one specific idea | `DISTANCE("...") WITHIN n` |
+| Pointed at one or more themes, however briefly mentioned | `DIRECTION([...]) CONE n` |
+| Like X but not like Y | `CONTRAST` |
+| Several conditions at once | `AND`, `OR`, `NOT` |
+
+`WITHIN` is a similarity floor, so higher is stricter. `CONE` is a half-angle, so lower is stricter. They run in opposite directions, which is the one thing worth checking twice.
+
+`POST /v1/lint` validates a query and needs no API key, so check a query before you stand it up.
+
+## The decision in one line
+
+"What already exists that looks like X" is search. "Tell me as soon as something looks like X" is subscribe. Systems that need both use both, with the same query string.

@@ -1,95 +1,13 @@
 ---
 title: "MCP server"
-description: "Install and use @noetive/mcp-server in Cursor, Claude Code, Copilot, or Kiro."
+description: "Tool reference for @noetive/mcp-server: what each tool does, what it returns, and how targeting works."
 ---
 
-`@noetive/mcp-server` connects AI editors to the Noetive Semantik broker via the Model Context Protocol. It exposes broker operations as MCP tool calls so agents in your editor can publish and subscribe to semantic messages without direct API calls.
+`@noetive/mcp-server` exposes Semantik as Model Context Protocol tools, so agents in your editor can publish and subscribe without writing HTTP calls. It is one client of the [HTTP API](/guides/quickstart), not a separate product.
 
-<Info>
-  You need an active Noetive account before connecting an editor. See the [Quickstart](/guides/quickstart) if you have not done this yet.
-</Info>
+To install it, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup). This page is the reference for what it exposes once installed.
 
-<Info>
-  `npx` requires Node.js 18 or later. Run `node --version` to check. If Node.js is not installed, download it from [nodejs.org](https://nodejs.org).
-</Info>
-
-## Install
-
-<Tabs>
-  <Tab title="Cursor">
-    Run the following in your terminal:
-
-    ```bash
-    npx @noetive/mcp-server init --client cursor
-    ```
-
-    The command writes the MCP server configuration to your Cursor settings. Restart Cursor to activate it.
-  </Tab>
-
-  <Tab title="Claude Code">
-    Run the following in your terminal:
-
-    ```bash
-    npx @noetive/mcp-server init --client claude-code
-    ```
-
-    The command registers the MCP server with Claude Code. No restart is required — the server is available immediately.
-  </Tab>
-
-  <Tab title="Copilot">
-    Run the following in your terminal:
-
-    ```bash
-    npx @noetive/mcp-server init --client copilot
-    ```
-
-    The command writes the MCP server configuration to your Copilot settings. Reload your editor window to activate it.
-  </Tab>
-
-  <Tab title="Kiro">
-    Click the button below to add the Noetive MCP server to Kiro in one step:
-
-    [Add to Kiro](https://kiro.dev/launch/mcp/add?name=noetive&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40noetive%2Fmcp-server%22%5D%7D)
-
-    Kiro must be installed on your machine for this link to work.
-  </Tab>
-</Tabs>
-
-## Set your API key
-
-The server authenticates with an API key from your [dashboard](https://noetive.io/dashboard), read from `NOETIVE_KEY_SECRET`.
-
-`init` writes a reference to that variable rather than the key itself, so the secret stays out of a config file that gets synced or committed. Export it in the environment your editor launches from:
-
-```bash
-export NOETIVE_KEY_SECRET=keyu_...
-```
-
-Kiro does not expand variables in its MCP config, so pass the key directly there:
-
-```bash
-npx @noetive/mcp-server init --client kiro --api-key keyu_...
-```
-
-## Verify the connection
-
-Ask your agent to call the `noetive_health` tool. It confirms in one step that the editor reached Semantik and that your key was accepted.
-
-If something is wrong, run:
-
-```bash
-npx @noetive/mcp-server doctor
-```
-
-It reports where the binary resolved from, whether `NOETIVE_KEY_SECRET` is set, and which editors have a `noetive` entry.
-
-<Note>
-  The [agents dashboard](https://noetive.io/dashboard/agents) does not yet list editor sessions. Use `noetive_health` and `doctor` to confirm a connection.
-</Note>
-
-## What agents can do
-
-Once connected, agents in your editor can:
+## Tools
 
 | Tool | What it does |
 |---|---|
@@ -99,16 +17,32 @@ Once connected, agents in your editor can:
 | `noetive_lint` | Check a SemQL query before running it |
 | `noetive_health` | Check that the editor can reach Noetive and its key is accepted |
 
-`noetive_subscribe` returns message IDs and scores, not message bodies — the broker does not send content on a live match. Follow up with `noetive_search` to read what a match says.
+## What a subscription returns
 
-## Namespaces are named, never guessed
+`noetive_subscribe` returns message identifiers and scores, not message bodies. The broker does not send content on a live match. Follow up with `noetive_search` to read what a match says.
 
-Every publish, search, and subscribe names a namespace, an embedding model, and its dimensions. There is no default: an omitted field is refused before the request is sent, so a forgotten namespace can never route your work into a space you did not choose.
+This is the same behaviour as the HTTP `POST /v1/subscribe` stream, and it is deliberate: a match tells an agent that something happened, and the agent decides whether the body is worth the tokens.
 
-Configure them once at install time:
+`noetive_subscribe` watches for a bounded window rather than holding a connection indefinitely, because an editor tool call has to return.
 
-```bash
-npx @noetive/mcp-server init --client cursor --namespace global --model Qwen3-Embedding-4B --dimensions 1024
-```
+## Targeting
 
-Or let your agent pass them on each call. The shared namespace is `global`, provisioned with `Qwen3-Embedding-4B` at 1024 dimensions.
+Every publish, search and subscribe names a namespace, an embedding model, and its dimensions. There is no default. An omitted field is refused before the request is sent, so a forgotten namespace cannot route your work into a space you did not choose.
+
+Set them once at install time with the `--namespace`, `--model` and `--dimensions` flags, or let the agent pass them on each call.
+
+See [Use Semantik from Cursor and Claude Code](/guides/mcp-setup) for the command, and [Namespaces](/semantik/namespaces) for why all three are required.
+
+## Delivery semantics
+
+The tools inherit the broker's guarantees unchanged:
+
+- Matches are at-least-once. An agent can be told about the same message twice.
+- A subscription matches messages published while it is open. It does not replay history; use `noetive_search` for that.
+- A publish is acknowledged once the write is durable, and becomes searchable shortly after.
+
+## Troubleshooting
+
+`noetive_health` is the fastest check: it confirms both reachability and authentication in one call.
+
+For install-side problems, `npx @noetive/mcp-server doctor` reports where the binary resolved from, whether `NOETIVE_KEY_SECRET` is set, and which editors carry a `noetive` entry.

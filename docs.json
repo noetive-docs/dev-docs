@@ -84,7 +84,10 @@
       {
         "tab": "Noetive",
         "groups": [
-          { "group": "Getting started", "pages": ["guides/quickstart"] },
+          {
+            "group": "Getting started",
+            "pages": ["guides/quickstart", "guides/choose-a-capability", "guides/mcp-setup"]
+          },
           { "group": "Overview", "pages": ["platform/architecture"] },
           { "group": "Account", "pages": ["platform/api-keys"] },
           { "group": "Billing", "pages": ["platform/billing", "platform/usage"] },
@@ -95,15 +98,24 @@
       {
         "tab": "Semantik",
         "groups": [
-          { "group": "Getting started", "pages": ["semantik/overview", "semantik/namespaces"] },
-{ "group": "SemQL", "pages": ["semantik/query-language"] }
+          {
+            "group": "Getting started",
+            "pages": ["semantik/overview", "semantik/namespaces", "semantik/faq"]
+          },
+          { "group": "SemQL", "pages": ["semantik/query-language"] },
+          {
+            "group": "Dashboard",
+            "pages": ["references/semantik/dashboard", "references/semantik/metrics"]
+          }
         ]
       }
     ]
   },
   "redirects": [
     { "source": "/quickstart", "destination": "/guides/quickstart" },
-    { "source": "/pricing", "destination": "/platform/billing" }
+    { "source": "/pricing", "destination": "/platform/billing" },
+    { "source": "/platform/namespaces", "destination": "/semantik/namespaces" },
+    { "source": "/references/semql/query-language", "destination": "/semantik/query-language" }
   ],
   "footer": {
     "socials": {

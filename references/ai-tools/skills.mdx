@@ -1,16 +1,44 @@
 ---
-title: "Claude Code skills"
-description: "Reusable slash-command extensions for Claude Code."
+title: "Agent skills"
+description: "Bundled skills that teach an agent when to reach for Semantik and how to write SemQL."
 ---
 
-Skills are reusable prompt files that extend Claude Code with curated instructions for a specific task. Reference a skill by name in your prompt:
+Skills are instruction files an agent loads for a task. The Noetive MCP installer bundles three:
+
+| Skill | What it teaches |
+|---|---|
+| `semantik` | What Semantik is and which capability fits a given problem |
+| `semql` | How to write and debug SemQL queries |
+| `doctor` | How to diagnose a broken install or a failing call |
+
+## Installing
+
+The installer writes them for you:
+
+```bash
+npx @noetive/mcp-server init --client claude-code --skills all
+```
+
+`--skills` takes `all`, `none`, or a comma-separated list of skill names. Run `init` without it and the installer asks.
+
+<Note>
+  Only Claude Code declares a skills directory today, so `--skills` applies there. Installing the MCP server in any other supported editor still gives that editor the [tools](/references/ai-tools/mcp); it just does not place skill files.
+</Note>
+
+## Using a skill
+
+Reference it by name in your prompt:
 
 ```
 load the semql skill and write a subscription for payment failure signals
 ```
 
-Claude Code reads the skill file and applies its instructions to the task. Skills are session-scoped — they apply for the duration of the conversation.
+The agent reads the skill file and applies its instructions to the task. Skills are session-scoped: they apply for the duration of the conversation.
 
-## Installing skills
+## Removing
 
-Download skill files from the [Noetive GitHub repository](https://github.com/noetive) into a `skills/` directory in your project. Claude Code discovers them automatically when you work in that directory.
+```bash
+npx @noetive/mcp-server remove --client claude-code
+```
+
+This takes back out what the install put in, including the skill files it wrote.

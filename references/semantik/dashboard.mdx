@@ -9,12 +9,12 @@ The Semantik dashboard at [/dashboard/semantik](https://noetive.io/dashboard/sem
 
 The table lists all namespaces in your account. Each row shows:
 
-- **Namespace ID** — the identifier used in SemQL `NAMESPACE` clauses
+- **Namespace ID**, the internal identifier. Note that SemQL `NAMESPACE` clauses and the wire `namespace` field take the namespace **name**, not this ID; a raw `ns_...` value is refused.
 - **Name** — the label you assigned at creation
 - **Edit** — update the namespace name
 - **Delete** — permanently remove the namespace and all its data
 
-See [Namespaces](/platform/namespaces) for details on creating and managing namespaces.
+See [Namespaces](/semantik/namespaces) for details on creating and managing namespaces.
 
 ## Metrics panel
 

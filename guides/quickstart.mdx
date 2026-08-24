@@ -1,28 +1,112 @@
 ---
 title: "Quickstart"
-description: "Get Noetive running with your AI agent in minutes."
+description: "Publish a message, find it by meaning, and stream matches as they arrive."
 ---
 
+Semantik is a semantic message broker at `https://semantik.noetive.io`. You publish messages, describe what you care about as a SemQL query rather than a topic name, and receive matching messages either on a live stream or through a one-shot search.
+
+This page uses four HTTP calls and nothing else. To connect an editor instead, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup).
+
+## Before you start
+
+- **An API key.** Create one under [Settings → Developer keys](https://noetive.io/settings/developer-keys) and export it as `NOETIVE_KEY_SECRET`. See [API keys](/platform/api-keys).
+- **An active subscription.** Publish, search and subscribe are metered and answer `402 not_billable` without one. See [Billing](/platform/billing).
+- **A namespace.** These examples use the shared `global` namespace, which is provisioned for the `Qwen3-Embedding-4B` model at 1024 dimensions. See [Namespaces](/semantik/namespaces).
+
+<Warning>
+  The `global` namespace is shared. Messages you publish there are readable by other Noetive customers. Create your own namespace before publishing anything you would not want a stranger to search.
+</Warning>
+
 <Steps>
-  <Step title="Create an account">
-    Go to [noetive.io/access](https://noetive.io/access) and enter your email address. Noetive sends a one-time passcode — enter it to complete sign-in. On first sign-in you land on the Semantik dashboard.
-
-    If the code does not arrive within a few minutes, check your spam folder. Codes expire after 10 minutes.
-  </Step>
-
-  <Step title="Install the MCP server">
-    The MCP server connects your AI editor to Noetive. Run the init command for your editor:
-
+  <Step title="Publish a message">
     ```bash
-    npx @noetive/mcp-server init --client cursor
+    curl -sS https://semantik.noetive.io/v1/publish -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"items":[{"text":"The payment gateway started timing out on checkout at 14:02 UTC."}],"metadata":{"source":"quickstart"}}'
     ```
 
-    See [MCP setup](/references/ai-tools/mcp) for instructions specific to each supported editor.
+    The response carries the identifier you will see again in search results and in match frames:
+
+    ```json
+    {"message_id":"msg_01jd...","epoch":7,"seq":"..."}
+    ```
+
+    <Note>
+      `namespace`, `model` and `dimensions` are required on every call. Semantik resolves a namespace by that triple and guesses none of them, so there is no default to fall back on. One request carries exactly one item.
+    </Note>
   </Step>
 
-  <Step title="Verify the connection">
-    Open the [agents dashboard](https://noetive.io/dashboard/agents). Your editor should appear as an active client with a session ID and a recent "last seen" timestamp.
+  <Step title="Find it with one query">
+    The same SemQL you will subscribe with also works as a one-shot search:
 
-    If your editor does not appear, check the [MCP setup guide](/references/ai-tools/mcp) for editor-specific troubleshooting.
+    ```bash
+    curl -sS https://semantik.noetive.io/v1/search -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 NAMESPACE \"global\" LIMIT 5"}'
+    ```
+
+    Results come back ranked, each with the message body, its score and its `message_id`.
+
+    Note that the query matched a message that shares none of its wording. `WITHIN` is a similarity floor, so a higher number is stricter. See [SemQL](/semantik/query-language) for the full clause set.
+
+    <Info>
+      A publish is acknowledged once the write is durable, and the message becomes searchable shortly after. If `results` comes back empty on your first try, run the search again in a moment.
+    </Info>
+  </Step>
+
+  <Step title="Stand the same query up as a subscription">
+    In a second terminal, open a stream with the identical query:
+
+    ```bash
+    curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 NAMESPACE \"global\""}'
+    ```
+
+    The first frame confirms the subscription is live:
+
+    ```
+    event: subscribed
+    data: {"subscription_id":"sub_01jd..."}
+    ```
+
+    `-N` disables curl's output buffering, without which frames sit in a buffer instead of printing. The subscription lives as long as the connection, and it matches messages published while it is open. It does not replay history; that is what step 2 is for.
+  </Step>
+
+  <Step title="Publish again and watch the match arrive">
+    Back in the first terminal, publish something else that means the same thing:
+
+    ```bash
+    curl -sS https://semantik.noetive.io/v1/publish -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"items":[{"text":"Checkout is failing again, the card processor is not responding."}]}'
+    ```
+
+    A frame appears on the open stream:
+
+    ```
+    event: match
+    data: {"message_id":"msg_01je...","score":0.61,"seq":"..."}
+    ```
+
+    A match frame carries identifiers, not bodies. Read the body with the search call from step 2. Delivery is at-least-once, so dedupe on `message_id` if your consumer cannot take a repeat.
   </Step>
 </Steps>
+
+## What you just used
+
+| You did | Endpoint |
+|---|---|
+| Sent a message into a namespace | `POST /v1/publish` |
+| Asked what already matches a meaning | `POST /v1/search` |
+| Asked to be told when something matches | `POST /v1/subscribe` |
+| Checked a query before running it | `POST /v1/lint` (no API key needed) |
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Which capability for which problem" icon="signs-post" href="/guides/choose-a-capability">
+    Search or subscribe, and which SemQL clause fits.
+  </Card>
+  <Card title="SemQL" icon="code" href="/semantik/query-language">
+    DISTANCE, DIRECTION, CONTRAST and the scoping clauses.
+  </Card>
+  <Card title="From your editor" icon="terminal" href="/guides/mcp-setup">
+    Use Semantik from Cursor, Claude Code and other MCP clients.
+  </Card>
+  <Card title="Namespaces" icon="box" href="/semantik/namespaces">
+    Isolation, embedding models, and the shared global namespace.
+  </Card>
+</CardGroup>
