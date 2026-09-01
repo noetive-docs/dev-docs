@@ -37,7 +37,20 @@ Names are case-insensitive.
 
 ## Targeting a namespace
 
-Name a namespace in SemQL via the `NAMESPACE` clause:
+Every publish, search and subscribe scopes itself with the `namespace` field in the request body, alongside `model` and `dimensions`:
+
+```json
+{
+  "namespace": "acme-prod",
+  "model": "Qwen3-Embedding-4B",
+  "dimensions": 1024,
+  "query": "MATCH DISTANCE(\"payment failure\") WITHIN 0.5 LIMIT 20"
+}
+```
+
+There is no default, so the field is required on every call.
+
+SemQL also has a `NAMESPACE` clause:
 
 ```sql
 MATCH DISTANCE("payment failure") WITHIN 0.5

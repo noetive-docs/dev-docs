@@ -51,8 +51,8 @@ LIMIT 20
 |-------|------|----------|---------|-------------|
 | `anchor` | string \| float[] | yes | — | Center point — natural language text or raw embedding vector |
 | `within` | number | no | — | Minimum cosine similarity (0.0–1.0); 0 means no floor |
-| `top_k` | integer | no | — | Return top-k nearest neighbors |
-| `metric` | string | no | `"cosine"` | Distance metric: `"cosine"`, `"euclidean"`, or `"dot"` |
+| `top_k` | integer | no | — | Return top-k nearest neighbors, 1–1000. Search only; `/v1/subscribe` rejects it |
+| `metric` | string | no | `"cosine"` | Distance metric: `"cosine"`, `"euclidean"`, or `"dot"`. JSON only; the text syntax has no equivalent keyword |
 
 <Note>
 `within` is a **similarity floor, not a distance ceiling**. A message matches when its similarity to the anchor is at least `within`, so a **higher value is stricter**. `WITHIN 0.9` is near-exact; `WITHIN 0.3` lets almost everything through. Values above 1.0 are rejected.
@@ -125,10 +125,10 @@ NAMESPACE "org:acme-corp"
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `attract` | string[] | yes | — | Concepts to attract toward |
-| `repel` | string[] | yes | — | Concepts to repel from |
+| `repel` | string[] | no | — | Concepts to repel from |
 | `within` | number | no | — | Minimum cosine similarity to the composite vector (0.0–1.0); 0 means no floor |
 
-The composite vector is `normalize(mean(embed(attract)) − mean(embed(repel)))`.
+The composite vector is `normalize(mean(embed(attract)) − mean(embed(repel)))`. With `repel` absent it is `normalize(mean(embed(attract)))`.
 
 ---
 
@@ -162,13 +162,27 @@ MATCH DIRECTION("infrastructure security") CONE 0.3
   AND NOT DISTANCE("routine monitoring") WITHIN 0.75
 ```
 
+`NOT` narrows a result set but cannot say where to look, so a query whose top level is a bare `NOT` is rejected. Pair it with a positive clause, as above.
+
+---
+
+## What subscribe rejects
+
+`/v1/subscribe` accepts a narrower query set than `/v1/search`: **any use of `TOP` returns `400 invalid_request`**.
+
+`TOP` ranks a message against the others in a result set. A stream has no result set, since each message is scored on its own as it is published, so the clause has no meaning there and is refused rather than quietly ignored. Use `WITHIN` to set a score floor instead.
+
+The query is legal SemQL, so `/v1/lint` reports it as valid. This restriction belongs to the subscribe endpoint, not to the language.
+
+Subscribe also refuses a query that would match every message, since that delivers the namespace's entire stream rather than a subscription. In practice a query that constrains nothing — an empty `toward` or `attract` list — is already rejected as invalid SemQL before it reaches that check.
+
 ---
 
 ## Modifiers
 
 ### NAMESPACE
 
-Scopes the query to one or more namespaces. Without a `NAMESPACE` clause, the query searches the default namespace only.
+Names one or more namespaces inside the query. Every call already scopes itself with the `namespace` field in the request body, and there is no default namespace to fall back on. See [Namespaces](/semantik/namespaces).
 
 Namespace names match exactly — wildcards are not supported. List each namespace you want, and use `NOT` to exclude one from a broader scope.
 
@@ -205,7 +219,7 @@ JSON form uses ISO 8601 durations: `"P7D"`, `"PT48H"`, `"PT30M"`.
 
 ### LIMIT
 
-Caps the number of results returned.
+Caps the number of results returned. Defaults to 100 when omitted, and is clamped to a maximum of 1000. A larger value succeeds and returns 1000 rather than failing. See [Limits](/semantik/limits).
 
 ```sql
 LIMIT 100
@@ -228,6 +242,8 @@ DISTANCE("payment reconciliation failure")
 ```sql
 DISTANCE([0.182, -0.041, 0.389, 0.057])
 ```
+
+A query carries at most **32 anchors** in total, and at most **8 anchors in a single list** — the `toward` list of a `DIRECTION` clause, or either list of a `CONTRAST` clause. Anchor text across the whole query is capped at 4 KB, and vector anchors at 8192 floats. Over any of these, the query is rejected before anything is embedded. Full table in [Limits](/semantik/limits).
 
 ---
 

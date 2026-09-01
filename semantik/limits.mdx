@@ -1,0 +1,115 @@
+---
+title: "Limits"
+description: "Request, publish, and query limits enforced by the Semantik API."
+---
+
+Every limit on this page is enforced by the broker. Exceeding one returns `400 invalid_request` with a message naming the field, except where the table says the value is clamped.
+
+All string and text limits are measured in **UTF-8 bytes**, not characters. A 64-byte metadata key holds 64 ASCII characters but fewer accented or CJK ones.
+
+## Request bodies
+
+| Endpoint | Maximum body |
+|---|---|
+| `POST /v1/publish` | 2 MB |
+| `POST /v1/search` | 1 MB |
+| `POST /v1/subscribe` | 1 MB |
+| `POST /v1/lint` | 64 KB |
+
+A body over the cap returns `413`, not `400`.
+
+## Namespace, model, dimensions
+
+These three fields are required on every publish, search, and subscribe. There is no default — see [Namespaces](/semantik/namespaces) for why.
+
+| Field | Limit |
+|---|---|
+| `namespace` | ≤ 64 bytes, characters `A–Z a–z 0–9 _ -` |
+| `dimensions` | 1–4096, and must equal the namespace's configured dimension count |
+| `model` | must match the namespace's configured model |
+
+## Publish
+
+```json
+{
+  "namespace": "articles",
+  "model": "Qwen3-Embedding-4B",
+  "dimensions": 1024,
+  "items": [{ "text": "GPU shortage delays cluster expansion." }],
+  "metadata": { "source": "internal-feed" },
+  "idempotency_key": "feed-2026-08-28-0417"
+}
+```
+
+| Field | Limit |
+|---|---|
+| `items` | exactly 1 |
+| `items[].text` | ≤ 32 KB |
+| `items[].vector` | ≤ 4096 floats, length must equal `dimensions`, no `NaN` or `Inf` |
+| `metadata` | ≤ 16 keys |
+| `metadata` key | ≤ 64 bytes |
+| `metadata` value | ≤ 256 bytes |
+| `metadata` total | ≤ 4 KB, summed across all keys and values |
+| `idempotency_key` | ≤ 256 bytes |
+
+The 32 KB `text` cap applies even when you supply your own `vector`. Text is stored and returned by search whether or not the broker embedded it.
+
+Metadata keys and values, and the idempotency key, must be valid UTF-8 with no control characters. Control bytes are rejected because metadata is echoed back in search results.
+
+## Query
+
+These apply to the SemQL query in `/v1/search`, `/v1/subscribe`, and `/v1/lint`.
+
+Search and subscribe reject a query that exceeds one of them while it is being parsed — before any anchor is embedded, so a rejected query costs no embedding tokens. Lint reports the same problems as diagnostics with `"valid": false` and a `200`, so it is the cheapest way to check a generated query against these caps before sending it.
+
+| Limit | Value |
+|---|---|
+| Anchors per query, across all clauses | 32 |
+| Anchors in one list (`DIRECTION` toward, `ATTRACT`, `REPEL`) | 8 |
+| Namespace names in `NAMESPACE` | 8 |
+| Namespace names in the `NOT` exclusion list | 8 |
+| Floats in one vector anchor | 4096 |
+| Floats across all vector anchors in a query | 8192 |
+| Anchor text plus namespace names, combined | 4 KB |
+| Nodes per query — clauses plus boolean operators | 64 |
+| Operands per `AND` or `OR` | 16 |
+| Parenthesis nesting depth | 128 |
+
+### Value ranges
+
+| Parameter | Range |
+|---|---|
+| `WITHIN` | 0.0–1.0 |
+| `CONE` | 0–π radians |
+| `LIMIT` | positive integer |
+| `WINDOW` | positive duration |
+
+`WITHIN` and `TOP` are mutually exclusive on a single clause.
+
+## Result count
+
+`LIMIT` is the one query value that is clamped rather than rejected.
+
+| Source | Behaviour |
+|---|---|
+| `limit` request field | wins over the query's `LIMIT` clause |
+| `LIMIT` in the query | used when the request field is absent |
+| neither set | 100 results |
+| either set above 1000 | clamped to 1000 |
+
+<Warning>
+  A request for `LIMIT 50000` succeeds and returns at most 1000 results. Because the response is a success, a client that assumes it received everything will silently miss results. Page with a narrower `WINDOW` or a tighter query rather than a larger `LIMIT`.
+</Warning>
+
+## Working within the limits
+
+**Anchor lists overflow before anchor counts do.** A `DIRECTION` list built by expanding synonyms hits the 8-item cap long before the query hits 32 anchors. Split into two clauses joined with `OR` instead of dropping concepts:
+
+```sql
+MATCH DIRECTION(["outage", "downtime", "degraded", "unavailable"]) CONE 0.4
+   OR DIRECTION(["latency spike", "timeout", "slow response"]) CONE 0.4
+```
+
+**The 4 KB text budget is shared.** It covers every anchor string and namespace name in one query, so a handful of sentence-length anchors can exhaust it well below 32 anchors. Short concept phrases match as well and cost less of the budget.
+
+**Prefer text anchors to vector anchors.** A single 1024-dimension vector anchor consumes an eighth of the 8192-float query budget, so a query can carry only eight of them. Text anchors have no equivalent per-query ceiling beyond the 4 KB budget.

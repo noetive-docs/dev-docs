@@ -1,0 +1,73 @@
+---
+title: "Errors and retries"
+description: "The error envelope, which codes are worth retrying, and how to correlate a failure with a server log line."
+---
+
+Every error carries a stable machine-readable code, a human-readable message, and a correlation token:
+
+```json
+{
+  "error": "unavailable",
+  "message": "service is temporarily unavailable",
+  "request_id": "1-68b4c2a1-3f9d2e4b8c1a7f0e5d3b2a91",
+  "retry_after_ms": 1000
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `error` | Stable code to branch on. Never parse `message` |
+| `message` | Human-readable description. Wording can change |
+| `request_id` | Server-assigned correlation token, also in the `X-Request-Id` header |
+| `retry_after_ms` | How long to wait before retrying. Absent or `0` means do not retry |
+
+## Which errors to retry
+
+| Code | Status | Retry |
+|---|---|---|
+| `unavailable` | 503 | Yes, after `retry_after_ms` |
+| `namespace_unavailable` | 503 | Yes, after `retry_after_ms` |
+| `metering_unavailable` | 503 | Yes, after `retry_after_ms` |
+| `backpressure` | 429 | Yes, after `retry_after_ms` |
+| `rate_limited` | 429 | No. Slow down, then resume |
+| `too_many_requests` | 429 | No. Concurrency or subscription cap reached |
+| `internal_error` | 500 | No by default. See below |
+| `invalid_request` | 400 | No. Fix the request |
+| `model_not_provisioned` | 400 | No. The namespace has no entry for that model and dimension count |
+| `unauthorized` | 401 | No. Check the bearer token |
+| `not_billable` | 402 | No. Resolve billing first |
+| `namespace_disabled` | 403 | No. The namespace is administratively off |
+| `not_found` | 404 | No. Check the base URL and path |
+| `idempotency_key_conflict` | 409 | No. See [Delivery and idempotency](/semantik/delivery) |
+| `request_too_large` | 413 | No. Send a smaller body. See [Limits](/semantik/limits) |
+| `unsupported_media_type` | 415 | No. Send `Content-Type: application/json` |
+
+`internal_error` can be deterministic, so a blind retry can loop on the same failure. Retry a publish only when it carries an `idempotency_key`; without one you risk storing the message twice.
+
+## Backing off
+
+`retry_after_ms` and the RFC 9110 `Retry-After` header carry the same hint. Either one wins over whatever schedule your client uses.
+
+When the server sends no hint, back off exponentially with jitter, cap the delay, and stop after a small number of attempts. Cap any hint you honour, server-supplied or not, so a bad value cannot park a request for hours.
+
+## Correlating a failure
+
+Every response, success or failure, carries an `X-Request-Id` header. Error bodies repeat the same value as `request_id` so it survives client-side logging that drops headers.
+
+Log `request_id` on every failure and quote it to support. It pivots directly to the corresponding server log line.
+
+Inbound `X-Request-Id` headers are ignored; the server assigns the value. Send `X-Amzn-Trace-Id` and its `Root=` segment becomes the request id, so upstream trace correlation works without translation.
+
+## Malformed requests fail loudly
+
+Request bodies decode strictly. Each of these returns `400 invalid_request`:
+
+- An empty body, or a body that is not valid JSON
+- A field this API does not define, including a misspelled one
+- Trailing content after the first JSON value
+
+An unknown field is an error rather than being ignored, so `{"namesapce": "articles"}` fails immediately instead of silently falling back to a default that does not exist.
+
+## Checking a query before you send it
+
+`POST /v1/lint` reports the same query problems as diagnostics with `"valid": false` and a `200`, needs no API key, and embeds nothing. It is the cheap way to check a generated query before spending a request on it.

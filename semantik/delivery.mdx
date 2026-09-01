@@ -1,0 +1,94 @@
+---
+title: "Delivery and idempotency"
+description: "What a publish acknowledgement promises, how to make a retry safe, and what a subscriber must handle."
+---
+
+## A publish acknowledges durability, not visibility
+
+A `200` from `POST /v1/publish` means the message is on durable media and survives a restart. It becomes searchable shortly afterwards.
+
+There is no read-your-writes guarantee and no "wait until indexed" flag. A search that returns `{"results": []}` immediately after a publish is expected behaviour, not a failure. Run it again in a moment.
+
+## Acknowledgement modes
+
+`ack` takes `stored` (the default) or `durable`.
+
+Both acknowledge only after the message is written to durable storage, so choosing between them changes nothing today. The field is accepted so a future deployment can offer a weaker, faster mode without a breaking change.
+
+## Making a retry safe
+
+A publish that times out may or may not have been stored. `idempotency_key` closes that gap:
+
+```json
+{
+  "namespace": "articles",
+  "model": "Qwen3-Embedding-4B",
+  "dimensions": 1024,
+  "items": [{ "text": "GPU shortage delays cluster expansion." }],
+  "idempotency_key": "feed-2026-08-28-0417"
+}
+```
+
+It is a body field, not an HTTP header. Maximum 256 bytes, valid UTF-8, no control characters.
+
+| You send | You get |
+|---|---|
+| Same key, same message, within 5 minutes | The original `message_id` and `seq`. Nothing is stored twice |
+| Same key, different message, within 5 minutes | `409 idempotency_key_conflict`. Nothing is stored |
+| No key | Every call stores a new message, retries included |
+
+The key is scoped to the namespace, so a retry is still recognised even when its embedding differs slightly from the first attempt.
+
+<Warning>
+  The retry window is best-effort and does not survive a server restart. A retry sent across one may be stored a second time. Use `idempotency_key` to make a retry safe, not as a long-lived deduplication guarantee.
+</Warning>
+
+On a `409`, retrying as-is will keep failing. Either re-send the original message under that key, or publish the new message under a key of its own.
+
+## Identifying and ordering messages
+
+A publish returns three values:
+
+```json
+{ "message_id": "msg_01jd7a21de40f1b2c493", "epoch": 7, "seq": 149 }
+```
+
+`message_id` is stable and globally unique. It is the same identifier that comes back in search results and in match frames, and it is what you deduplicate on.
+
+`epoch` and `seq` are opaque. Consecutive publishes to one namespace routinely return unrelated and non-increasing values, so `seq` is **not** a namespace-wide ordering. Do not use it to order messages, to detect gaps, or as a cursor. It is not a position you can pass to `POST /v1/search`. Order by publish-time metadata you attach yourself.
+
+## What a subscriber has to handle
+
+Matches are delivered at-least-once. A consumer can see the same message twice, so deduplicate on `message_id` if a repeat would be harmful.
+
+`POST /v1/subscribe` answers with a Server-Sent Events stream. The first frame confirms registration:
+
+```text
+event: subscribed
+data: {"subscription_id":"sub_8f2c4e1a9b3d"}
+```
+
+Each match after that carries identifiers, not bodies. Read the body with `POST /v1/search` when you need it:
+
+```text
+event: match
+data: {"message_id":"msg_01je9c40f1b2c4937a2","seq":150,"score":0.61}
+```
+
+Rely on `message_id` and `score`. Treat anything else in the frame as opaque.
+
+The stream also carries keepalive comment frames — lines beginning with `:` — so an idle subscription is distinguishable from a dead one. Ignore them and never surface them as matches. Use a real SSE parser rather than splitting on newlines; comment-only lines and multi-line `data:` fields are where hand-rolled parsers break.
+
+<Note>
+  A subscription matches only messages published while it is open. It does not replay history. Pair it with a search if you also need what came before.
+</Note>
+
+### Setup failures and stream failures are different
+
+A subscribe call that fails before the stream opens committed no state. Nothing was installed and no match can have been missed, so retrying the open is safe. Treat a transient code here exactly as you would on publish or search: honour `retry_after_ms` and reopen. See [Errors and retries](/semantik/errors).
+
+A stream that dies after delivering matches is a different problem. There is no resume cursor. Reconnecting registers a logically fresh subscription, and whether you see a replay or a gap across the reconnect is not guaranteed. Surface the disconnect to the caller with the last `message_id` seen, deduplicate on reconnect, and let the caller decide whether to reopen rather than reconnecting automatically.
+
+### Timeouts
+
+Bound the wait for the first frame. A few seconds is enough, and exceeding it means setup failed. Leave the read side long or unbounded: a healthy subscription can be quiet for a long time, and the keepalive frames are what tell you it is still alive.

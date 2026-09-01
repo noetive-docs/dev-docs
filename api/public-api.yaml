@@ -1,0 +1,1072 @@
+openapi: 3.0.3
+info:
+  title: Noetive Semantik API
+  version: 0.4.0
+  description: |
+    Noetive Semantik is a managed semantic search and subscription service.
+    Publish messages tagged with embedding vectors, query them with the
+    SemQL query language, and subscribe to live match streams over
+    Server-Sent Events.
+
+    All request and response bodies are JSON. The `/v1/subscribe` endpoint
+    accepts a JSON POST request and upgrades the response to an SSE stream
+    of match events.
+
+    ## Request decoding
+
+    Every JSON endpoint decodes strictly. A request is rejected with
+    `400 invalid_request` when the body is empty, is not valid JSON,
+    **carries a field this specification does not define**, or carries
+    trailing content after the first JSON value. Unknown fields are an
+    error rather than being ignored, so a misspelled field name fails
+    loudly instead of silently taking a default.
+
+    ## SemQL query limits
+
+    These bound the `query` field on `/v1/search`, `/v1/subscribe`, and
+    `/v1/lint`. Search and subscribe reject an over-limit query with
+    `400 invalid_request` while parsing it — before any anchor is embedded,
+    so a rejected query is not billed for embedding. `/v1/lint` reports the
+    same problems as diagnostics with `valid: false` and a `200`, which
+    makes it the cheap way to check a generated query before sending it.
+
+    | limit | value |
+    | --- | --- |
+    | anchors per query, across all clauses | 32 |
+    | anchors in one list (`DIRECTION` toward, `ATTRACT`, `REPEL`) | 8 |
+    | namespace names in `NAMESPACE` | 8 |
+    | namespace names in the `NOT` exclusion list | 8 |
+    | floats in one vector anchor | 4096 |
+    | floats across all vector anchors in one query | 8192 |
+    | anchor text plus namespace names, combined | 4 KB |
+    | nodes per query (clauses plus boolean operators) | 64 |
+    | operands per `AND` or `OR` | 16 |
+    | parenthesis nesting depth | 128 |
+
+    Value ranges: `WITHIN` in `[0, 1]`, `CONE` in `[0, π]` radians, `LIMIT`
+    and `WINDOW` strictly positive. `WITHIN` and `TOP` are mutually
+    exclusive on one clause. `LIMIT` is the exception to the reject rule —
+    see `SearchRequest.limit`.
+
+    ## Request correlation
+
+    Every response — success or error — carries an `X-Request-Id` header
+    with a server-assigned correlation token. Error response bodies repeat
+    the same value in the `request_id` field so it survives client-side
+    logging that strips headers. Quote `request_id` when contacting
+    support; it pivots directly to the corresponding server log line.
+
+    Inbound `X-Request-Id` headers from clients are ignored — the server
+    assigns the value authoritatively to prevent log injection. When the
+    request carries an `X-Amzn-Trace-Id` header, its `Root=` segment is
+    used as the request id so upstream trace correlation works without
+    translation. Otherwise a fresh server-side identifier is minted.
+
+    ## Error codes
+
+    Error responses carry a stable machine-readable `error` code, an
+    optional human-readable `message`, the server-assigned `request_id`,
+    and (for retryable failures) a `retry_after_ms` hint. Known codes:
+
+    | code | meaning |
+    | --- | --- |
+    | `invalid_request` | request body failed validation |
+    | `unauthorized` | missing or invalid bearer token |
+    | `not_found` | no endpoint at the request path — check the base URL; do not retry |
+    | `idempotency_key_conflict` | the `idempotency_key` is live from an earlier publish carrying different content; nothing was stored |
+    | `unsupported_media_type` | `Content-Type` is not `application/json` |
+    | `request_too_large` | request body exceeds the endpoint size limit |
+    | `rate_limited` | per-client burst or rate limit exhausted |
+    | `too_many_requests` | concurrency limit exhausted, or the namespace is at its concurrent-subscription cap |
+    | `unavailable` | service temporarily unavailable; retry after `retry_after_ms` |
+    | `namespace_unavailable` | namespace lookup is transiently unavailable; retry after `retry_after_ms` |
+    | `namespace_disabled` | the namespace alias exists but has been administratively disabled |
+    | `model_not_provisioned` | the namespace alias exists but has no entry for the requested (model, dimensions) combination |
+    | `not_billable` | no active subscription on the account; resolve billing before retrying |
+    | `metering_unavailable` | metered billing is transiently unavailable; retry with backoff |
+    | `internal_error` | unexpected server error — quote `request_id` when contacting support |
+  contact:
+    name: Noetive Support
+    url: https://noetive.io
+    email: support@noetive.io
+  license:
+    name: Noetive Commercial
+    url: https://noetive.io/terms
+
+servers:
+  - url: https://semantik.noetive.io
+    description: Global Semantik endpoint
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Search
+    description: Run a SemQL query against published messages.
+  - name: Publish
+    description: Ingest messages with embedding vectors.
+  - name: Subscribe
+    description: Open a live SSE stream of matches for a SemQL query.
+  - name: Tooling
+    description: Query authoring helpers (lint, auto-complete).
+  - name: Health
+    description: Liveness probe.
+
+paths:
+  /v1/search:
+    post:
+      operationId: search
+      tags: [Search]
+      summary: Execute a SemQL semantic search query
+      description: |
+        Compiles the SemQL query, embeds any text anchors, evaluates matches
+        across the namespace, and returns ranked results.
+
+        If the request omits `limit`, the limit is taken from the SemQL
+        `LIMIT n` clause when present.
+
+        Requires `Content-Type: application/json`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+            examples:
+              textQuery:
+                summary: Text anchor search
+                value:
+                  query: 'MATCH DISTANCE("machine learning research") WITHIN 0.4 LIMIT 10'
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+      responses:
+        '200':
+          description: Ranked search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: |
+            Invalid request. `error` is one of:
+
+            - `invalid_request` — malformed JSON, SemQL compile error,
+              missing required field, malformed namespace, or unknown
+              namespace alias.
+            - `model_not_provisioned` — the namespace alias exists but has
+              no entry for the requested (model, dimensions) combination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API key bearer token. `error` is `unauthorized`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: |
+            Request is authenticated but billing blocks the call. `error` is
+            `not_billable`: the account has no active subscription.
+            Retrying will keep failing until billing is resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            Namespace is administratively disabled. `error` is
+            `namespace_disabled`. The alias resolves but has been turned
+            off; retries do not help until the namespace is re-enabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method not allowed (only POST is accepted).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds 1 MB size limit. `error` is `request_too_large`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Content-Type must be application/json. `error` is `unsupported_media_type`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: |
+            Rate limited or too many concurrent requests.
+            Error codes: `rate_limited` or `too_many_requests`.
+            `retry_after_ms` is set; clients should back off.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error. `error` is `internal_error`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: |
+            Service is temporarily unavailable. `error` is one of:
+
+            - `unavailable` — the service or one of its dependencies is
+              transiently unavailable. Retry after `retry_after_ms`.
+            - `namespace_unavailable` — namespace lookup is transiently
+              unavailable.
+            - `metering_unavailable` — metered billing is transiently
+              unavailable; retry with exponential backoff.
+
+            `retry_after_ms` is set on all of the above; the `Retry-After`
+            header is populated alongside it.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying (RFC 9110).
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/publish:
+    post:
+      operationId: publish
+      tags: [Publish]
+      summary: Publish a message
+      description: |
+        Publishes a message into a namespace. The message is either a text
+        string (the server computes the embedding) or a pre-computed
+        embedding vector.
+
+        Acknowledgement durability is controlled by the `ack` field. The
+        response carries the server-assigned `message_id` plus the opaque
+        `epoch` and `seq` ordering tokens.
+
+        Requires `Content-Type: application/json`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+            examples:
+              textItem:
+                summary: Publish a text message (server embeds)
+                value:
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+                  items:
+                    - text: 'Transformer models have reshaped NLP benchmarks.'
+                  metadata:
+                    source: arxiv
+                    author: jdoe
+                  ack: durable
+              vectorItem:
+                summary: Publish a pre-computed vector
+                value:
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+                  items:
+                    - vector: [0.12, -0.04, 0.88]
+                  ack: stored
+      responses:
+        '200':
+          description: Message acknowledged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResponse'
+        '400':
+          description: |
+            Invalid request. `error` is one of:
+
+            - `invalid_request` — empty body, invalid JSON, missing items,
+              an item without exactly one of `text` or `vector`, metadata
+              exceeding limits, a malformed namespace, or an unknown
+              namespace alias.
+            - `model_not_provisioned` — the namespace alias exists but has
+              no entry for the requested (model, dimensions) combination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API key bearer token. `error` is `unauthorized`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: |
+            Request is authenticated but billing blocks the call. `error` is
+            `not_billable`: the account has no active subscription.
+            Retrying will keep failing until billing is resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            Namespace is administratively disabled. `error` is
+            `namespace_disabled`. Retries do not help until the namespace
+            is re-enabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            `error` is `idempotency_key_conflict`: the `idempotency_key` is
+            still live from an earlier publish that carried a different
+            message. Nothing was stored.
+
+            Retrying as-is will keep failing. Either re-send the original
+            message under this key, or publish the new message under a key
+            of its own.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds 2 MB size limit. `error` is `request_too_large`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Content-Type must be application/json. `error` is `unsupported_media_type`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: |
+            Service is overloaded or applying backpressure. `error` is one
+            of `rate_limited`, `too_many_requests`, or `backpressure`.
+            `retry_after_ms` is set; clients should back off.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error. `error` is `internal_error`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: |
+            Service is temporarily unavailable. `error` is one of:
+
+            - `unavailable` — the service is shedding load or a dependency
+              is transiently unavailable. `retry_after_ms` is set and the
+              `Retry-After` header is populated; clients should wait and
+              resend.
+            - `namespace_unavailable` — namespace lookup is transiently
+              unavailable.
+            - `metering_unavailable` — metered billing is transiently
+              unavailable. Retry with exponential backoff.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying (RFC 9110).
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/lint:
+    post:
+      operationId: lint
+      tags: [Tooling]
+      security: []
+      summary: Lint and auto-complete a SemQL query
+      description: |
+        Validates a SemQL query and returns diagnostics (parse/validation
+        errors) and auto-complete suggestions at the given cursor position.
+        Always returns both diagnostics and completions in a single call.
+
+        Requires `Content-Type: application/json`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LintRequest'
+            examples:
+              simple:
+                summary: Lint a partial query
+                value:
+                  query: 'MATCH DISTANCE("climate change") WITHIN '
+                  cursor: 40
+      responses:
+        '200':
+          description: Lint diagnostics and completions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LintResponse'
+        '400':
+          description: Invalid request body, malformed JSON, missing query, or cursor out of bounds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '405':
+          description: Method not allowed (only POST is accepted).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds 64 KB size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Content-Type must be application/json.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: |
+            Rate limited or too many concurrent requests.
+            Error codes: `rate_limited` or `too_many_requests`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/subscribe:
+    post:
+      operationId: subscribe
+      tags: [Subscribe]
+      summary: Register a persistent subscription and open an SSE match stream
+      description: |
+        Compiles the SemQL query, registers a persistent subscription, and
+        returns a Server-Sent Events stream of match notifications.
+
+        The stream begins with a `subscribed` event whose `data` is a
+        `SubscribedEvent` JSON object. Subsequent `match` events carry a
+        `MatchEvent` JSON object. The subscription is removed automatically
+        when the client disconnects.
+
+        Example SSE frames:
+
+        ```
+        event: subscribed
+        data: {"subscription_id":"sub_8f2c..."}
+
+        event: match
+        data: {"message_id":"msg_7a21de40f1b2c493","score":0.82}
+        ```
+
+        Requires `Content-Type: application/json`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribeRequest'
+            examples:
+              simple:
+                summary: Subscribe to a SemQL query
+                value:
+                  query: 'MATCH DISTANCE("gpu shortage") WITHIN 0.5'
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+      responses:
+        '200':
+          description: |
+            SSE stream of match events. `Content-Type: text/event-stream`.
+
+            - First event: `event: subscribed`, data is a `SubscribedEvent`.
+            - Subsequent events: `event: match`, data is a `MatchEvent`.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Raw SSE stream. Payload schemas for each event type are
+                  `SubscribedEvent` and `MatchEvent`.
+        '400':
+          description: |
+            Invalid request. `error` is one of:
+
+            - `invalid_request` — malformed JSON, an unknown field, a
+              missing required field, a SemQL compile or limit error, a
+              malformed namespace, or an unknown namespace alias. Also
+              returned for a query that constrains nothing (no `DISTANCE`,
+              `DIRECTION` or `CONTRAST` clause) and for any use of `TOP`,
+              neither of which a subscription supports.
+            - `model_not_provisioned` — the namespace alias exists but has
+              no entry for the requested (model, dimensions) combination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API key bearer token. `error` is `unauthorized`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '402':
+          description: |
+            Request is authenticated but billing blocks the call. `error` is
+            `not_billable`: the account has no active subscription.
+            Retrying will keep failing until billing is resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: |
+            Namespace is administratively disabled. `error` is
+            `namespace_disabled`. Retries do not help until the namespace
+            is re-enabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body exceeds 1 MB size limit. `error` is `request_too_large`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Content-Type must be application/json. `error` is `unsupported_media_type`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: |
+            Rate limited or too many concurrent subscriptions.
+            Error codes: `rate_limited` or `too_many_requests`.
+            `retry_after_ms` is set; clients should back off.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Subscription setup failed. `error` is `internal_error`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: |
+            Service is temporarily unavailable. `error` is one of:
+
+            - `unavailable` — subscription setup exceeded its budget or a
+              service dependency is transiently unavailable.
+              `retry_after_ms` is set.
+            - `namespace_unavailable` — namespace lookup is transiently
+              unavailable.
+            - `metering_unavailable` — metered billing is transiently
+              unavailable. Retry with exponential backoff.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying (RFC 9110).
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/health:
+    post:
+      operationId: healthCheck
+      tags: [Health]
+      security: []
+      summary: Health check
+      description: Returns 200 with an empty body when the service is running.
+      responses:
+        '200':
+          description: Healthy
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        API key bearer token. Obtain from the Noetive dashboard.
+        Pass as: `Authorization: Bearer <api-key>`.
+
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - query
+        - namespace
+        - model
+        - dimensions
+      properties:
+        query:
+          type: string
+          description: |
+            Raw SemQL text submitted by the client. Subject to the SemQL
+            query limits — see the "SemQL query limits" section in the API
+            description.
+        namespace:
+          type: string
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: |
+            Target namespace alias — a registered name (e.g. `articles`) or
+            the well-known `global` alias. Required; there is no default.
+            Every request is validated against the namespace's configured
+            model and dimensions; a mismatch returns `400 invalid_request`.
+
+            Pass the alias, not the `ns_...` identifier shown in the
+            dashboard — a raw identifier is rejected with
+            `400 invalid_request`.
+        model:
+          type: string
+          description: |
+            Embedding model name. Required; there is no default. Must match
+            the model configured on the namespace, or the request fails with
+            `400 model_not_provisioned`.
+        dimensions:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          description: |
+            Embedding vector dimensionality. Required; there is no default.
+            Must match the dimensionality configured on the namespace for
+            `model`, or the request fails with `400 model_not_provisioned`.
+        limit:
+          type: integer
+          minimum: 1
+          description: |
+            Maximum number of results to return. Takes precedence over the
+            SemQL `LIMIT n` clause; when both are omitted, 100 results are
+            returned.
+
+            Values above 1000 are **clamped to 1000, not rejected** — the
+            request succeeds and returns at most 1000 results. A client that
+            treats a successful response as "everything matched" will
+            silently miss results. Narrow the `WINDOW` or tighten the query
+            instead of raising the limit.
+
+    SearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResultItem'
+          description: Ranked list of matched documents.
+
+    ResultItem:
+      type: object
+      properties:
+        content:
+          type: string
+          description: |
+            Message body of the matched document. Empty when the message was
+            published as a vector with no `text`, which is legitimate — such a
+            message is searchable and scoreable but has no body to return.
+        message_id:
+          type: string
+          description: Stable, globally unique identifier of the matched message.
+        namespace:
+          type: string
+          description: Namespace of the matched message.
+        score:
+          type: number
+          format: float
+          description: Composite relevance score.
+        metadata:
+          type: object
+          description: |
+            Key-value metadata attached at publish time. Same constraints
+            as `PublishRequest.metadata`.
+          additionalProperties:
+            type: string
+
+    PublishRequest:
+      type: object
+      required:
+        - items
+        - namespace
+        - model
+        - dimensions
+      properties:
+        namespace:
+          type: string
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: |
+            Target namespace alias — a registered name (e.g. `articles`) or
+            the well-known `global` alias. Required; there is no default.
+            Every request is validated against the namespace's configured
+            model and dimensions; a mismatch returns `400 invalid_request`.
+
+            Pass the alias, not the `ns_...` identifier shown in the
+            dashboard — a raw identifier is rejected with
+            `400 invalid_request`.
+        model:
+          type: string
+          description: |
+            Embedding model name. Required; there is no default. Must match
+            the model configured on the namespace, or the request fails with
+            `400 model_not_provisioned`.
+        dimensions:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          description: |
+            Embedding vector dimensionality. Required; there is no default.
+            Must match the dimensionality configured on the namespace for
+            `model`, or the request fails with `400 model_not_provisioned`.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1
+          description: |
+            Messages to publish. Currently exactly one item per request.
+            Each item is either a text message (server computes the
+            embedding) or a pre-computed embedding vector.
+          items:
+            $ref: '#/components/schemas/PublishItem'
+        metadata:
+          type: object
+          description: |
+            Optional key-value metadata attached to the message.
+
+            Every limit is measured in **UTF-8 bytes**, not characters:
+            max 16 keys; max 64 bytes per key; max 256 bytes per value;
+            max 4 KB summed across all keys and values.
+
+            Keys and values must be valid UTF-8 and must not contain ASCII
+            control characters. Metadata is echoed back in search results,
+            so a raw newline or escape byte is refused rather than
+            propagated.
+          maxProperties: 16
+          additionalProperties:
+            type: string
+            maxLength: 256
+        idempotency_key:
+          type: string
+          maxLength: 256
+          description: |
+            Optional client-supplied key that makes a publish safe to retry.
+            Must be valid UTF-8 and free of control characters.
+
+            Re-sending the same key with the same message within 5 minutes
+            returns the original `message_id` and `seq` without storing a
+            second copy. The key is scoped to the namespace, so a retry is
+            still recognised even if its embedding differs slightly from the
+            first attempt.
+
+            Re-using a live key for a *different* message returns
+            `409 idempotency_key_conflict`. Two different messages cannot
+            share one identity, and the second is not stored.
+
+            The retry window is best-effort and does not survive a server
+            restart: a retry sent across one may be stored a second time.
+            Use it to make a retry safe, not as a long-lived deduplication
+            guarantee.
+        ack:
+          type: string
+          enum:
+            - stored
+            - durable
+          description: |
+            Acknowledgement durability. Defaults to `stored` when omitted.
+
+            - `stored` — returns once the message is on durable media.
+            - `durable` — returns once the message is on durable media.
+
+            Both modes currently give the same guarantee: a publish is
+            acknowledged only after the message is written to durable
+            storage, and an acknowledged message survives a server restart.
+            The field is accepted so a future deployment can offer a weaker,
+            faster mode without a breaking change; today, choosing between
+            them changes nothing.
+
+    PublishItem:
+      type: object
+      description: |
+        A message to publish. At least one of `text` or `vector` must
+        be provided. When both are provided, `vector` takes precedence
+        — the server stores the supplied vector as-is and does not
+        embed `text`. This lets clients that already have an embedding
+        include the source text in the request without paying for a
+        server-side embed call.
+      properties:
+        text:
+          type: string
+          maxLength: 32768
+          description: |
+            Text content to publish. The server computes the embedding
+            when no `vector` is supplied.
+
+            Maximum 32 KB, enforced whether or not a `vector` accompanies
+            it — the text is stored and returned by search either way.
+        vector:
+          type: array
+          maxItems: 4096
+          items:
+            type: number
+            format: float
+          description: |
+            Pre-computed embedding vector. When present, takes
+            precedence over `text` and skips server-side embedding.
+
+            Length must equal the request's `dimensions`, which is itself
+            capped at 4096 and must match the namespace's configured model
+            dimensionality. `NaN` and `Infinity` components are rejected
+            with `400 invalid_request`.
+
+    PublishResponse:
+      type: object
+      required:
+        - message_id
+        - epoch
+        - seq
+      properties:
+        message_id:
+          type: string
+          description: |
+            Stable, globally unique identifier of the published message.
+            The same `message_id` appears in `ResultItem.message_id` when
+            this message matches a future search.
+        epoch:
+          type: integer
+          format: uint64
+          description: |
+            Opaque token accompanying `seq`. Treat it as opaque: do not
+            order by it, compare it across namespaces, or derive meaning
+            from its value. It is returned so a future deployment can
+            qualify `seq` without a breaking change.
+        seq:
+          type: integer
+          format: uint64
+          description: |
+            Opaque write-position token, paired with `epoch`.
+
+            It is **not** a namespace-wide ordering. Consecutive publishes
+            to one namespace routinely return unrelated and non-increasing
+            values, so `seq` must not be used to order a namespace's
+            messages, to detect gaps, or as a cursor — it is not a position
+            usable with `/v1/search`. Use `message_id` to identify a
+            message and publish-time metadata to order one.
+
+    LintRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Raw SemQL text to lint and auto-complete.
+        cursor:
+          type: integer
+          minimum: 0
+          description: |
+            Byte offset in the query where auto-complete context is
+            evaluated. When omitted, defaults to the end of the query.
+
+            An explicit `0` is honoured as written and returns
+            start-of-query completions — it is not treated as "omitted".
+            An offset past the end of the query, or a negative one, returns
+            `400 invalid_request`.
+
+    LintResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: True when the query has no diagnostics.
+        normalized:
+          type: string
+          description: Canonical SemQL text form (empty when invalid).
+        diagnostics:
+          type: array
+          items:
+            $ref: '#/components/schemas/LintDiagnostic'
+          description: Parse and validation errors found in the query.
+        completions:
+          type: array
+          items:
+            $ref: '#/components/schemas/LintCompletion'
+          description: Valid next tokens at the cursor position.
+
+    LintDiagnostic:
+      type: object
+      properties:
+        severity:
+          type: string
+          description: Diagnostic severity (`error`, `warning`).
+        message:
+          type: string
+          description: Human-readable error description.
+        line:
+          type: integer
+          description: 1-based line number where the error starts.
+        col:
+          type: integer
+          description: 1-based column number where the error starts.
+        end_line:
+          type: integer
+          description: 1-based line number where the error ends.
+        end_col:
+          type: integer
+          description: 1-based column number where the error ends.
+
+    LintCompletion:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Display text for the completion.
+        kind:
+          type: string
+          description: Completion kind (`clause`, `keyword`, `operator`, `delimiter`, `anchor`).
+        detail:
+          type: string
+          description: Human-readable description of what the completion does.
+
+    SubscribeRequest:
+      type: object
+      required:
+        - query
+        - namespace
+        - model
+        - dimensions
+      properties:
+        query:
+          type: string
+          description: |
+            SemQL query text for subscription matching. Subject to the SemQL
+            query limits — see the "SemQL query limits" section in the API
+            description.
+
+            Two clause shapes are rejected here that `/v1/search` accepts:
+            a query with no `DISTANCE`, `DIRECTION` or `CONTRAST` clause
+            (it would deliver the namespace's entire stream), and any use of
+            `TOP` (it ranks within a result set, and a stream has none — use
+            `WITHIN` instead). Both return `400 invalid_request`.
+        namespace:
+          type: string
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: |
+            Target namespace alias — a registered name (e.g. `articles`) or
+            the well-known `global` alias. Required; there is no default.
+            Every request is validated against the namespace's configured
+            model and dimensions; a mismatch returns `400 invalid_request`.
+
+            Pass the alias, not the `ns_...` identifier shown in the
+            dashboard — a raw identifier is rejected with
+            `400 invalid_request`.
+        model:
+          type: string
+          description: |
+            Embedding model name. Required; there is no default. Must match
+            the model configured on the namespace, or the request fails with
+            `400 model_not_provisioned`.
+        dimensions:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          description: |
+            Embedding vector dimensionality. Required; there is no default.
+            Must match the dimensionality configured on the namespace for
+            `model`, or the request fails with `400 model_not_provisioned`.
+
+    SubscribedEvent:
+      type: object
+      description: |
+        Payload of the first SSE frame (`event: subscribed`) emitted on
+        `/v1/subscribe` once the subscription is registered.
+      required:
+        - subscription_id
+      properties:
+        subscription_id:
+          type: string
+          description: Stable identifier for the registered subscription.
+
+    MatchEvent:
+      type: object
+      description: |
+        Payload of subsequent SSE frames (`event: match`) emitted on
+        `/v1/subscribe` when a published message matches the subscription.
+      required:
+        - message_id
+        - score
+      properties:
+        message_id:
+          type: string
+          description: Stable, globally unique identifier of the matched message.
+        score:
+          type: number
+          format: float
+          description: Composite relevance score.
+        seq:
+          type: integer
+          format: uint64
+          description: |
+            The matched message's `seq`, carrying the same meaning and the
+            same caveats as `PublishResponse.seq` — it is not a
+            namespace-wide ordering. Matches are delivered concurrently and
+            are not ordered by it; it is here so a subscriber can recognise
+            a message it has already seen, not so it can sequence a stream.
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: |
+            Machine-readable error code. See the "Error codes" table in the
+            API description for the full list.
+        message:
+          type: string
+          description: Human-readable error description.
+        request_id:
+          type: string
+          description: |
+            Server-assigned correlation token, also returned in the
+            `X-Request-Id` response header. Quote this when contacting
+            support — it pivots directly to the relevant server log line.
+        retry_after_ms:
+          type: integer
+          format: uint32
+          description: |
+            Hint for how long to wait before retrying. Present on
+            `backpressure`, `unavailable`, `namespace_unavailable`, and
+            `metering_unavailable` errors; absent (or `0`) means do not
+            retry.

@@ -26,22 +26,24 @@ This page uses four HTTP calls and nothing else. To connect an editor instead, s
     The response carries the identifier you will see again in search results and in match frames:
 
     ```json
-    {"message_id":"msg_01jd...","epoch":7,"seq":"..."}
+    {"message_id":"msg_01jd7a21de40f1b2c493","epoch":7,"seq":149}
     ```
 
     <Note>
       `namespace`, `model` and `dimensions` are required on every call. Semantik resolves a namespace by that triple and guesses none of them, so there is no default to fall back on. One request carries exactly one item.
     </Note>
+
+    Bodies decode strictly: a field this API does not define is a `400`, not a key that is quietly ignored. A misspelled `namesapce` fails here rather than three steps later.
   </Step>
 
   <Step title="Find it with one query">
     The same SemQL you will subscribe with also works as a one-shot search:
 
     ```bash
-    curl -sS https://semantik.noetive.io/v1/search -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 NAMESPACE \"global\" LIMIT 5"}'
+    curl -sS https://semantik.noetive.io/v1/search -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 LIMIT 5"}'
     ```
 
-    Results come back ranked, each with the message body, its score and its `message_id`.
+    Results come back ranked, each with the message body, its score and its `message_id`. The `namespace` field in the request body is what scopes the call.
 
     Note that the query matched a message that shares none of its wording. `WITHIN` is a similarity floor, so a higher number is stricter. See [SemQL](/semantik/query-language) for the full clause set.
 
@@ -54,17 +56,19 @@ This page uses four HTTP calls and nothing else. To connect an editor instead, s
     In a second terminal, open a stream with the identical query:
 
     ```bash
-    curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 NAMESPACE \"global\""}'
+    curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5"}'
     ```
 
     The first frame confirms the subscription is live:
 
-    ```
+    ```text
     event: subscribed
-    data: {"subscription_id":"sub_01jd..."}
+    data: {"subscription_id":"sub_8f2c4e1a9b3d"}
     ```
 
     `-N` disables curl's output buffering, without which frames sit in a buffer instead of printing. The subscription lives as long as the connection, and it matches messages published while it is open. It does not replay history; that is what step 2 is for.
+
+    While nothing matches, the stream carries keepalive comment frames — lines beginning with `:`. Ignore them; they are what keeps a quiet subscription from looking dead.
   </Step>
 
   <Step title="Publish again and watch the match arrive">
@@ -76,12 +80,12 @@ This page uses four HTTP calls and nothing else. To connect an editor instead, s
 
     A frame appears on the open stream:
 
-    ```
+    ```text
     event: match
-    data: {"message_id":"msg_01je...","score":0.61,"seq":"..."}
+    data: {"message_id":"msg_01je9c40f1b2c4937a2","seq":150,"score":0.61}
     ```
 
-    A match frame carries identifiers, not bodies. Read the body with the search call from step 2. Delivery is at-least-once, so dedupe on `message_id` if your consumer cannot take a repeat.
+    A match frame carries identifiers, not bodies. Read the body with the search call from step 2. Delivery is at-least-once, so dedupe on `message_id` if your consumer cannot take a repeat. See [Delivery and idempotency](/semantik/delivery) for what else a subscriber has to handle.
   </Step>
 </Steps>
 
@@ -109,4 +113,12 @@ This page uses four HTTP calls and nothing else. To connect an editor instead, s
   <Card title="Namespaces" icon="box" href="/semantik/namespaces">
     Isolation, embedding models, and the shared global namespace.
   </Card>
+  <Card title="Errors and retries" icon="triangle-alert" href="/semantik/errors">
+    The error envelope, which codes to retry, and how to correlate a failure.
+  </Card>
+  <Card title="Delivery and idempotency" icon="shield-check" href="/semantik/delivery">
+    What an acknowledgement promises, and what a subscriber has to handle.
+  </Card>
 </CardGroup>
+
+Request and response schemas for all five endpoints are under **API Reference** in the top navigation.

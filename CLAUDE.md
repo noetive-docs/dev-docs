@@ -274,3 +274,9 @@ If useful, I can also break down **the exact documentation architecture Stripe u
 ## Mintlify llms.txt
 
 https://www.mintlify.com/docs/llms.txt
+
+## api/public-api.yaml has an upstream
+
+`api/public-api.yaml` is a copy of `public-api.yaml` in the `noetive-semantik` repo, which is the source of truth for the Semantik API contract. The whole API Reference tab is generated from it.
+
+Sync is manual: re-copy the file whenever the service ships a contract change. A stale copy produces a silently wrong reference rather than a build failure, so nothing will warn you. Do not edit the copy — fix it upstream and re-copy, otherwise the next sync reverts the edit.

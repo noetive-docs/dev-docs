@@ -104,8 +104,28 @@
           },
           { "group": "SemQL", "pages": ["semantik/query-language"] },
           {
+            "group": "Reference",
+            "pages": ["semantik/limits", "semantik/errors", "semantik/delivery"]
+          },
+          {
             "group": "Dashboard",
             "pages": ["references/semantik/dashboard", "references/semantik/metrics"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "openapi": "api/public-api.yaml",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "POST /v1/publish",
+              "POST /v1/search",
+              "POST /v1/subscribe",
+              "POST /v1/lint",
+              "POST /v1/health"
+            ]
           }
         ]
       }
