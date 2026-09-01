@@ -34,8 +34,6 @@ info:
     | --- | --- |
     | anchors per query, across all clauses | 32 |
     | anchors in one list (`DIRECTION` toward, `ATTRACT`, `REPEL`) | 8 |
-    | namespace names in `NAMESPACE` | 8 |
-    | namespace names in the `NOT` exclusion list | 8 |
     | floats in one vector anchor | 4096 |
     | floats across all vector anchors in one query | 8192 |
     | anchor text plus namespace names, combined | 4 KB |
@@ -47,6 +45,26 @@ info:
     and `WINDOW` strictly positive. `WITHIN` and `TOP` are mutually
     exclusive on one clause. `LIMIT` is the exception to the reject rule —
     see `SearchRequest.limit`.
+
+    ## Namespace scope and the `NAMESPACE` clause
+
+    A request runs in exactly one namespace: the one named by the
+    `namespace` request field. That field is required, and it is what
+    the API key is authorized against.
+
+    A query may restate it with a `NAMESPACE` clause, and the clause is
+    then checked rather than applied. `NAMESPACE "acme"` and
+    `NAMESPACE GLOBAL` are accepted when they agree with the `namespace`
+    field and rejected with `400 invalid_request` when they do not — which
+    is how a stored or generated query can carry the namespace it was
+    written for and fail loudly if it is ever sent against another.
+
+    Selecting several namespaces from a query is **not supported yet**.
+    Multiple names, `NOT` exclusions and `ALL` parse as SemQL but are
+    rejected with `400 invalid_request` rather than ignored, so a clause
+    written to narrow a search never silently widens it. `/v1/lint`
+    reports these shapes as diagnostics with `valid: false`; it cannot
+    check agreement, which depends on a request field it does not carry.
 
     ## Request correlation
 
@@ -153,7 +171,9 @@ paths:
 
             - `invalid_request` — malformed JSON, SemQL compile error,
               missing required field, malformed namespace, or unknown
-              namespace alias.
+              namespace alias. Also returned when a `NAMESPACE` clause
+              disagrees with the `namespace` field, or names more than one
+              namespace — see "Namespace scope and the `NAMESPACE` clause".
             - `model_not_provisioned` — the namespace alias exists but has
               no entry for the requested (model, dimensions) combination.
           content:
@@ -522,7 +542,10 @@ paths:
               malformed namespace, or an unknown namespace alias. Also
               returned for a query that constrains nothing (no `DISTANCE`,
               `DIRECTION` or `CONTRAST` clause) and for any use of `TOP`,
-              neither of which a subscription supports.
+              neither of which a subscription supports. Also returned when a
+              `NAMESPACE` clause disagrees with the `namespace` field, or
+              names more than one namespace — see "Namespace scope and the
+              `NAMESPACE` clause".
             - `model_not_provisioned` — the namespace alias exists but has
               no entry for the requested (model, dimensions) combination.
           content:
@@ -635,9 +658,12 @@ components:
           description: |
             Raw SemQL text submitted by the client. Subject to the SemQL
             query limits — see the "SemQL query limits" section in the API
-            description.
+            description. A `NAMESPACE` clause must agree with the
+            `namespace` field below and may name only one namespace — see
+            "Namespace scope and the `NAMESPACE` clause".
         namespace:
           type: string
+          x-default: global
           maxLength: 64
           pattern: '^[A-Za-z0-9_-]+$'
           description: |
@@ -651,12 +677,14 @@ components:
             `400 invalid_request`.
         model:
           type: string
+          x-default: Qwen3-Embedding-4B
           description: |
             Embedding model name. Required; there is no default. Must match
             the model configured on the namespace, or the request fails with
             `400 model_not_provisioned`.
         dimensions:
           type: integer
+          x-default: 1024
           minimum: 1
           maximum: 4096
           description: |
@@ -723,6 +751,7 @@ components:
       properties:
         namespace:
           type: string
+          x-default: global
           maxLength: 64
           pattern: '^[A-Za-z0-9_-]+$'
           description: |
@@ -736,12 +765,14 @@ components:
             `400 invalid_request`.
         model:
           type: string
+          x-default: Qwen3-Embedding-4B
           description: |
             Embedding model name. Required; there is no default. Must match
             the model configured on the namespace, or the request fails with
             `400 model_not_provisioned`.
         dimensions:
           type: integer
+          x-default: 1024
           minimum: 1
           maximum: 4096
           description: |
@@ -889,7 +920,13 @@ components:
       properties:
         query:
           type: string
-          description: Raw SemQL text to lint and auto-complete.
+          description: |
+            Raw SemQL text to lint and auto-complete.
+
+            Lint judges the query alone, so it reports a `NAMESPACE` clause
+            that names more than one namespace but cannot tell whether a
+            single-namespace clause agrees with the `namespace` field a
+            later `/v1/search` will carry.
         cursor:
           type: integer
           minimum: 0
@@ -970,7 +1007,9 @@ components:
           description: |
             SemQL query text for subscription matching. Subject to the SemQL
             query limits — see the "SemQL query limits" section in the API
-            description.
+            description. A `NAMESPACE` clause must agree with the
+            `namespace` field below and may name only one namespace — see
+            "Namespace scope and the `NAMESPACE` clause".
 
             Two clause shapes are rejected here that `/v1/search` accepts:
             a query with no `DISTANCE`, `DIRECTION` or `CONTRAST` clause
@@ -979,6 +1018,7 @@ components:
             `WITHIN` instead). Both return `400 invalid_request`.
         namespace:
           type: string
+          x-default: global
           maxLength: 64
           pattern: '^[A-Za-z0-9_-]+$'
           description: |
@@ -992,12 +1032,14 @@ components:
             `400 invalid_request`.
         model:
           type: string
+          x-default: Qwen3-Embedding-4B
           description: |
             Embedding model name. Required; there is no default. Must match
             the model configured on the namespace, or the request fails with
             `400 model_not_provisioned`.
         dimensions:
           type: integer
+          x-default: 1024
           minimum: 1
           maximum: 4096
           description: |

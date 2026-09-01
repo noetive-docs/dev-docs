@@ -44,6 +44,11 @@
   "seo": {
     "indexing": "all"
   },
+  "api": {
+    "examples": {
+      "prefill": true
+    }
+  },
   "feedback": {
     "thumbsRating": true,
     "suggestEdit": true,

@@ -50,7 +50,7 @@ Every publish, search and subscribe scopes itself with the `namespace` field in 
 
 There is no default, so the field is required on every call.
 
-SemQL also has a `NAMESPACE` clause:
+SemQL also has a `NAMESPACE` clause, which restates that scope so it can be checked:
 
 ```sql
 MATCH DISTANCE("payment failure") WITHIN 0.5
@@ -58,14 +58,13 @@ NAMESPACE "acme-prod"
 LIMIT 20
 ```
 
-You can target more than one:
+The clause does not change where the query runs — the request field does that. Sending this query with `"namespace": "acme-staging"` is refused with `400 invalid_request` rather than answered from staging, which is what makes it useful for a query that travels between environments.
 
-```sql
-MATCH DIRECTION(["outage", "service degradation"]) CONE 0.4
-NAMESPACE "acme-prod", "acme-staging"
-```
+<Note>
+  One request reaches one namespace. Selecting several from a query is not supported yet: multiple names, `NOT` exclusions and `ALL` are rejected rather than ignored. To cover several namespaces, issue one request each.
+</Note>
 
-See [SemQL query language](/semantik/query-language) for the full namespace selector syntax.
+See [SemQL query language](/semantik/query-language) for the full clause syntax.
 
 ## Editing a namespace
 
