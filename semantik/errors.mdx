@@ -37,6 +37,7 @@ Every error carries a stable machine-readable code, a human-readable message, an
 | `unauthorized` | 401 | No. Check the bearer token |
 | `not_billable` | 402 | No. Resolve billing first |
 | `namespace_disabled` | 403 | No. The namespace is administratively off |
+| `namespace_out_of_scope` | 403 | No. The namespace exists on your account, but the key's agent may not reach it |
 | `not_found` | 404 | No. Check the base URL and path |
 | `idempotency_key_conflict` | 409 | No. See [Delivery and idempotency](/semantik/delivery) |
 | `request_too_large` | 413 | No. Send a smaller body. See [Limits](/semantik/limits) |

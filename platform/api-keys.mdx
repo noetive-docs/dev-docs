@@ -5,6 +5,27 @@ description: "Developer credentials for programmatic access to Noetive."
 
 API keys authenticate programmatic requests to Noetive. The MCP server uses an API key to connect your editor to the broker on your behalf.
 
+Every key belongs to an **agent**. The agent decides which namespaces the key can reach, so two keys on the same account can have different access. Rotating a key does not change what its agent reaches, and narrowing an agent applies to every key it holds.
+
+## Agents
+
+An agent is whatever holds a key: a bot, a service, an editor. Manage them at [Agents](https://noetive.io/dashboard/agents).
+
+An agent reaches either:
+
+- **all your namespaces**, including ones you create later, or
+- **only the namespaces you pick**.
+
+The shared `global` namespace is a separate choice, so an agent can work entirely inside your own namespaces without touching it.
+
+<Tip>
+  Give each thing that holds a key its own agent. A leaked key then costs you that agent's namespaces rather than the whole account, and you can stop it without disturbing anything else.
+</Tip>
+
+Disabling an agent stops every key it holds. Deleting one requires revoking its keys first, so you see what you are about to break.
+
+If a namespace an agent was scoped to is deleted, the agent quietly reaches less than it did. The Agents page says so rather than leaving you to find out from a failing request.
+
 ## Creating a key
 
 <Warning>
@@ -12,9 +33,10 @@ API keys authenticate programmatic requests to Noetive. The MCP server uses an A
 </Warning>
 
 1. Go to [Settings → Developer keys](https://noetive.io/settings/developer-keys).
-2. Select **Create key**.
-3. Choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
-4. Copy the key immediately.
+2. Choose the **agent** the key belongs to. If you have none yet, create one at [Agents](https://noetive.io/dashboard/agents) first.
+3. Select **Create key**.
+4. Choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
+5. Copy the key immediately.
 
 After creation, the key appears in the list with only the first and last characters visible.
 
@@ -24,6 +46,8 @@ After creation, the key appears in the list with only the first and last charact
 |----------|-------|
 | Expiration options | Never, 30 days, 90 days, 1 year |
 | Display after creation | Shown once; first and last characters only thereafter |
+| Namespaces reached | Whatever the key's agent reaches |
+| Keys per agent | No limit. Issue a second to rotate without downtime |
 
 ## Revoking a key
 
@@ -31,6 +55,10 @@ After creation, the key appears in the list with only the first and last charact
   Revoking a key is irreversible. If the MCP server is using the revoked key, reconnect it with a new key.
 </Warning>
 
-Select **Revoke** next to any key in [Settings → Developer keys](https://noetive.io/settings/developer-keys). The key is invalidated immediately — any editor or service using it loses access.
+Select **Revoke** next to any key in [Settings → Developer keys](https://noetive.io/settings/developer-keys). Access stops within about a minute, including for subscriptions that were already open — an agent holding a revoked key is disconnected rather than left streaming.
+
+To stop everything an agent can do at once, disable the agent instead. That takes effect on the same timescale and does not destroy the keys, so you can turn it back on.
+
+To rotate without downtime: issue a second key for the same agent, move your service onto it, then revoke the first.
 
 Store keys in environment variables or a secrets manager. Do not commit them to source control.
