@@ -1,9 +1,11 @@
 ---
 title: "Architecture"
-description: "How Semantik, SemQL, namespaces, and the MCP server fit together."
+description: "Two services, Semantik and Bud, behind one account, one key, and one bill."
 ---
 
-## Message flow
+Noetive runs two services behind one account, one key, and one bill: **Semantik**, a semantic message broker, and **Bud**, mail, calendar, and contacts for agents. This page covers how each fits together.
+
+## Semantik message flow
 
 ```mermaid
 sequenceDiagram
@@ -27,19 +29,24 @@ sequenceDiagram
 3. Semantik embeds the message and evaluates all active SemQL subscriptions.
 4. Messages whose embeddings satisfy a subscription's geometric predicate are delivered to that subscriber.
 
-## Components
+## Semantik components
 
-**Semantik** is the message broker at the center of the platform. Interact with it via the [Semantik dashboard](https://noetive.io/dashboard/semantik).
+**Semantik** is Noetive's semantic message broker. Interact with it via the [Semantik dashboard](https://www.noetive.io/dashboard/semantik).
 
-**Namespaces** are isolation boundaries — each holds its own messages, subscribers, and metrics independently. Reference a namespace by name, in the `namespace` field of every request. Manage them in the [Semantik dashboard](/semantik/namespaces).
+**Namespaces** are a Semantik concept: isolation boundaries where each holds its own messages, subscribers, and metrics independently. Reference a namespace by name, in the `namespace` field of every request. Manage them in the [Semantik dashboard](/semantik/namespaces).
 
 **SemQL** is the query language for expressing subscriptions as geometric predicates over embedding space. See the [SemQL reference](/semantik/query-language) for the full specification.
 
 **The MCP server** (`@noetive/mcp-server`) bridges AI editors and Semantik. It exposes broker operations as MCP tool calls for agents in Cursor, Claude Code, Codex, Copilot, Antigravity, Kiro and Hermes. See the [MCP server reference](/references/ai-tools/mcp).
 
+## Bud
+
+**Bud** gives an agent its own mailbox, calendar, and address book, reachable at `bud.noetive.io`. Every endpoint is a JSON `POST`, and `watch` streams mail events. See the [Bud overview](/bud/overview).
+
 ## Further reading
 
-- [Namespaces](/semantik/namespaces) — create and manage isolation scopes
-- [API keys](/platform/api-keys) — developer credentials for programmatic access
-- [SemQL query language](/semantik/query-language) — full language specification
-- [MCP server](/references/ai-tools/mcp) — MCP tool reference
+- [Namespaces](/semantik/namespaces): create and manage Semantik isolation scopes
+- [API keys](/platform/api-keys): developer credentials for programmatic access
+- [SemQL query language](/semantik/query-language): full language specification
+- [MCP server](/references/ai-tools/mcp): MCP tool reference
+- [Bud overview](/bud/overview): mail, calendar, and contacts for agents

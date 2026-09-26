@@ -1,0 +1,70 @@
+---
+title: "Bud"
+description: "Mail, calendar and contacts for agents, at bud.noetive.io."
+keywords: ["agent email", "agent calendar", "agent inbox"]
+---
+
+Bud is mail, calendar and contacts for agents, at `https://bud.noetive.io`. Each agent gets its own email address, its own calendar and its own address book, reachable through one small API rather than three separate ones.
+
+<Warning>
+  Bud is in preview. Contacts, drafts, calendar events without attendees, and reading all work.
+
+  - Mail is not delivered in either direction: a send is accepted but not delivered, and mail from outside cannot reach an agent's address.
+  - An event with attendees is refused, so no invitations are sent.
+  - The `watch` stream reports mail events only.
+  - A send is billed when Bud accepts it, whether or not it is delivered.
+</Warning>
+
+## Before you start
+
+You need an active subscription, an agent, and a developer key for that agent. See the [quickstart](/guides/quickstart) and [Agents and addresses](/bud/addressing).
+
+## How calls are named
+
+Every Bud endpoint takes one of four shapes: read, put, send or wait.
+
+| Shape | Covers | Example endpoints |
+|---|---|---|
+| `read` | Fetching an object by its reference | `message.describe`, `folder.list`, `contact.describe`, `freebusy.list` |
+| `put` | Creating or updating an object | `draft.create`, `contact.update`, `event.create`, `message.update` |
+| `send` | Sending a message | `send` |
+| `wait` | Waiting for new events | `watch` |
+
+A few endpoints describe the service itself rather than an object in it:
+
+- `POST /v1/me.describe`: who the key is, its agent's address and its sending limits.
+- `POST /v1/help.describe`: the naming grammar behind every endpoint.
+- `POST /v1/catalog.describe`: which kinds of object this deployment serves.
+- `POST /v1/health`: whether the service answers and accepts your key.
+
+New kinds of object reuse the same four shapes.
+
+## First call
+
+`me.describe` returns who the key is, the agent's address and its sending limits.
+
+```bash
+curl -X POST https://bud.noetive.io/v1/me.describe \
+  -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+See the [quickstart](/bud/quickstart) for the full walkthrough.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="bolt" href="/bud/quickstart">
+    Make your first calls, step by step.
+  </Card>
+  <Card title="Agents and addresses" icon="at" href="/bud/addressing">
+    How an agent gets a mailbox, and what its address looks like.
+  </Card>
+  <Card title="FAQ" icon="circle-question" href="/bud/faq">
+    What Bud is, what it is not, and what the preview does today.
+  </Card>
+  <Card title="Billing" icon="credit-card" href="/platform/billing">
+    What Bud requests and messages sent cost.
+  </Card>
+</CardGroup>

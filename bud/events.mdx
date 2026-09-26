@@ -1,0 +1,89 @@
+---
+title: "Events"
+description: "Stream mail events as they happen with POST /v1/watch."
+---
+
+`POST /v1/watch` opens a Server-Sent Events stream of mail events for the mailboxes your key can read: mail arriving, a send leaving, a hold waiting on somebody, a delivery outcome for a message you sent. Calendar and contact changes are not on this stream.
+
+Opening a stream counts as one request, however long you keep it open.
+
+## Request
+
+```json
+{
+  "cursor": "41",
+  "mailbox": "ag_...",
+  "timeout_s": 25,
+  "types": ["mail.received", "mail.bounced"],
+  "agent_part": false
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `cursor` | Where to resume. Empty starts at the tail |
+| `mailbox` | Narrow to one mailbox. Empty means every mailbox your key can read |
+| `timeout_s` | How long each quiet interval lasts before a keepalive is sent, in seconds, at most 25. It does not end the stream |
+| `types` | Only these event types. Empty matches everything |
+| `agent_part` | Only messages carrying a machine-readable part |
+
+## The stream
+
+The stream is three kinds of line:
+
+- An `open` frame, once, carrying the cursor you supplied.
+- `batch` frames, each carrying `events` and the cursor after them, plus `error` when a failure ends the stream.
+- `: keepalive` comments while nothing is happening, so a silent connection is distinguishable from a dead one.
+
+```
+event: open
+data: {"cursor":"41"}
+
+: keepalive
+
+event: batch
+data: {"cursor":"42","events":[{"type":"mail.received","mailbox":"ag_...","message":"message_..."}]}
+
+event: batch
+data: {"cursor":"43","events":[{"type":"mail.sent","mailbox":"ag_...","message":"message_..."}]}
+```
+
+Store the cursor from a batch only after you've acted on its events; a crash between the two loses the event.
+
+An empty cursor starts the stream at the tail, which gives you no resumable position until the first `batch` arrives.
+
+## Reconnecting
+
+The stream stays open until you disconnect or the server is replaced. Reconnect with the last cursor you received and nothing is lost.
+
+## Before the stream opens
+
+A request that's wrong is refused before the stream opens, as an ordinary JSON error: a cursor that doesn't parse is `400 invalid`, and a key that reaches no mailbox is `403 forbidden_scope`. See [Errors](/bud/errors).
+
+An error that happens after `open` is a failure in flight: it arrives as a `batch` frame carrying `error` and ends the stream.
+
+## Scope
+
+The stream reports mail events for the mailboxes your key can read, and needs the `mail` scope. Calendar and contact changes are not reported.
+
+Delivery to a webhook endpoint instead of a stream is arranged through [support](https://www.noetive.io/support); `watch` itself is self-service.
+
+## Example
+
+```bash
+curl -N https://bud.noetive.io/v1/watch \
+  -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
+  -H "Content-Type: application/json" \
+  -d "{\"mailbox\":\"$MAILBOX\",\"timeout_s\":25}"
+```
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Errors" icon="triangle-exclamation" href="/bud/errors">
+    The error envelope, retryable codes, and correlating a failure.
+  </Card>
+  <Card title="Bud quickstart" icon="bolt" href="/bud/quickstart">
+    Make your first calls, step by step.
+  </Card>
+</CardGroup>

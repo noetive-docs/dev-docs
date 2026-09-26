@@ -3,13 +3,13 @@ title: "API keys"
 description: "Developer credentials for programmatic access to Noetive."
 ---
 
-API keys authenticate programmatic requests to Noetive. The MCP server uses an API key to connect your editor to the broker on your behalf.
+API keys authenticate programmatic requests to Noetive. The MCP server uses an API key to connect your editor to Semantik on your behalf. One key reaches both Semantik and Bud. Keys begin with `keya_`.
 
 Every key belongs to an **agent**. The agent decides which namespaces the key can reach, so two keys on the same account can have different access. Rotating a key does not change what its agent reaches, and narrowing an agent applies to every key it holds.
 
 ## Agents
 
-An agent is whatever holds a key: a bot, a service, an editor. Manage them at [Agents](https://noetive.io/dashboard/agents).
+This is how a key is scoped in Semantik. An agent is whatever holds a key: a bot, a service, an editor. Manage them at [Agents](https://www.noetive.io/dashboard/agents).
 
 An agent reaches either:
 
@@ -26,14 +26,20 @@ Disabling an agent stops every key it holds. Deleting one requires revoking its 
 
 If a namespace an agent was scoped to is deleted, the agent quietly reaches less than it did. The Agents page says so rather than leaving you to find out from a failing request.
 
+### In Bud
+
+The same key reaches its agent's own mailbox, calendar, and address book in Bud. The agent's mailbox is set up on the key's first request to Bud. A key must belong to an agent to reach Bud.
+
+Bud scopes are fixed (`mail`, `cal`, `book`, `blob`, `approve`, `freebusy`), with no picker. Reaching another agent's objects needs a grant, and access never crosses your account.
+
 ## Creating a key
 
 <Warning>
-  The full key value is shown only once, immediately after creation. Copy it before navigating away — you cannot retrieve it again.
+  The full key value is shown only once, immediately after creation. Copy it before navigating away: you cannot retrieve it again.
 </Warning>
 
-1. Go to [Settings → Developer keys](https://noetive.io/settings/developer-keys).
-2. Choose the **agent** the key belongs to. If you have none yet, create one at [Agents](https://noetive.io/dashboard/agents) first.
+1. Go to [Settings → Developer keys](https://www.noetive.io/settings/developer-keys).
+2. Choose the **agent** the key belongs to. If you have none yet, create one at [Agents](https://www.noetive.io/dashboard/agents) first.
 3. Select **Create key**.
 4. Choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
 5. Copy the key immediately.
@@ -44,10 +50,12 @@ After creation, the key appears in the list with only the first and last charact
 
 | Property | Value |
 |----------|-------|
+| Format | Begins with `keya_` |
 | Expiration options | Never, 30 days, 90 days, 1 year |
 | Display after creation | Shown once; first and last characters only thereafter |
-| Namespaces reached | Whatever the key's agent reaches |
+| Semantik namespaces reached | Whatever the key's agent reaches |
 | Keys per agent | No limit. Issue a second to rotate without downtime |
+| Bud scopes | Fixed: `mail`, `cal`, `book`, `blob`, `approve`, `freebusy` |
 
 ## Revoking a key
 
@@ -55,7 +63,7 @@ After creation, the key appears in the list with only the first and last charact
   Revoking a key is irreversible. If the MCP server is using the revoked key, reconnect it with a new key.
 </Warning>
 
-Select **Revoke** next to any key in [Settings → Developer keys](https://noetive.io/settings/developer-keys). Access stops within about a minute, including for subscriptions that were already open — an agent holding a revoked key is disconnected rather than left streaming.
+Select **Revoke** next to any key in [Settings → Developer keys](https://www.noetive.io/settings/developer-keys). New requests to both Semantik and Bud are refused within about a minute. In Semantik, subscriptions that were already open are also disconnected rather than left streaming.
 
 To stop everything an agent can do at once, disable the agent instead. That takes effect on the same timescale and does not destroy the keys, so you can turn it back on.
 

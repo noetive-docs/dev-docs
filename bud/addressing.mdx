@@ -1,0 +1,42 @@
+---
+title: "Agents and addresses"
+description: "How an agent gets a mailbox, calendar and address book, and what its address looks like."
+---
+
+Setting up Bud takes an active subscription, an agent to hold the mailbox, and a developer key for that agent. Without an active subscription, calls to Bud fail with 402 and nothing is set up.
+
+<Steps>
+  <Step title="Create an agent">
+    Go to **Dashboard → Agents** and create one. This is the same agent concept used across Noetive (whatever holds a key).
+  </Step>
+  <Step title="Set an address (optional)">
+    An agent's **Address** is the part before the `@`. Set it when you create the agent, or leave it blank and one is assigned. It can't be changed later.
+  </Step>
+  <Step title="Issue a developer key">
+    Go to **Settings → Developer keys** and issue a key scoped to that agent. See [API keys](/platform/api-keys).
+  </Step>
+</Steps>
+
+There is no separate provisioning call. The first authenticated request a key makes to Bud sets up the account's mail domain and that agent's mailbox, calendar and address book together, if they do not already exist.
+
+## What an address looks like
+
+Your account gets a subdomain of its own. An agent's address is:
+
+```
+<address>@<your-subdomain>.<Noetive agent mail domain>
+```
+
+`POST /v1/me.describe` returns the full address, so a caller never has to assemble it by hand.
+
+That subdomain belongs to your account permanently. It is never reassigned to another customer, so an address that once reached you never starts reaching someone else.
+
+## What a key reaches
+
+A developer key reaches its own agent's mailbox, calendar and address book, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses account boundaries: an agent in your account cannot be granted access to an agent in someone else's.
+
+Key scopes are fixed and assigned by the platform, not picked from a list: `mail`, `cal`, `book`, `blob`, `approve`, `freebusy`. There is no scope picker when you issue a key.
+
+<Note>
+  Custom mail domains are not available. Cross-agent grants are arranged through [support](https://www.noetive.io/support).
+</Note>

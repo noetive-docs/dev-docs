@@ -74,6 +74,7 @@
   "topbar": {
     "links": [
       { "name": "Semantik", "url": "https://www.noetive.io/semantik" },
+      { "name": "Bud", "url": "https://www.noetive.io/bud" },
       { "name": "MCP", "url": "https://www.noetive.io/mcp" },
       { "name": "Pricing", "url": "https://www.noetive.io/pricing" },
       { "name": "Blog", "url": "https://www.noetive.io/blog" },
@@ -91,13 +92,11 @@
         "groups": [
           {
             "group": "Getting started",
-            "pages": ["guides/quickstart", "guides/choose-a-capability", "guides/mcp-setup"]
+            "pages": ["guides/quickstart", "guides/mcp-setup"]
           },
           { "group": "Overview", "pages": ["platform/architecture"] },
           { "group": "Account", "pages": ["platform/api-keys"] },
-          { "group": "Billing", "pages": ["platform/billing", "platform/usage"] },
-          { "group": "MCP", "pages": ["references/ai-tools/mcp"] },
-          { "group": "Skills", "pages": ["references/ai-tools/skills"] }
+          { "group": "Billing", "pages": ["platform/billing", "platform/usage"] }
         ]
       },
       {
@@ -105,8 +104,9 @@
         "groups": [
           {
             "group": "Getting started",
-            "pages": ["semantik/overview", "semantik/namespaces", "semantik/faq"]
+            "pages": ["semantik/overview", "semantik/quickstart", "semantik/namespaces", "semantik/faq"]
           },
+          { "group": "Guides", "pages": ["semantik/search-or-subscribe"] },
           { "group": "SemQL", "pages": ["semantik/query-language"] },
           {
             "group": "Reference",
@@ -115,11 +115,23 @@
           {
             "group": "Dashboard",
             "pages": ["references/semantik/dashboard", "references/semantik/metrics"]
-          }
+          },
+          { "group": "MCP", "pages": ["references/ai-tools/mcp"] },
+          { "group": "Skills", "pages": ["references/ai-tools/skills"] }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Bud (Preview)",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["bud/overview", "bud/quickstart", "bud/addressing", "bud/faq"]
+          },
+          { "group": "Reference", "pages": ["bud/errors", "bud/events"] }
+        ]
+      },
+      {
+        "tab": "Semantik API",
         "openapi": "api/public-api.yaml",
         "groups": [
           {
@@ -133,6 +145,90 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Bud API",
+        "openapi": "api/bud-api.yaml",
+        "groups": [
+          {
+            "group": "Discovery",
+            "pages": [
+              "POST /v1/me.describe",
+              "POST /v1/help.describe",
+              "POST /v1/catalog.describe"
+            ]
+          },
+          {
+            "group": "Mail",
+            "pages": [
+              "POST /v1/folder.list",
+              "POST /v1/message.describe",
+              "POST /v1/message.update",
+              "POST /v1/thread.describe",
+              "POST /v1/thread.update",
+              "POST /v1/mailbox.describe",
+              "POST /v1/correspondent.list",
+              "POST /v1/search"
+            ]
+          },
+          {
+            "group": "Send",
+            "pages": [
+              "POST /v1/send",
+              "POST /v1/draft.create",
+              "POST /v1/draft.describe",
+              "POST /v1/draft.update",
+              "POST /v1/draft.delete",
+              "POST /v1/hold.describe",
+              "POST /v1/hold.update"
+            ]
+          },
+          {
+            "group": "Calendar",
+            "pages": [
+              "POST /v1/calendar.describe",
+              "POST /v1/calendarMonth.list",
+              "POST /v1/event.describe",
+              "POST /v1/event.create",
+              "POST /v1/event.update",
+              "POST /v1/event.delete",
+              "POST /v1/freebusy.list"
+            ]
+          },
+          {
+            "group": "Contacts",
+            "pages": [
+              "POST /v1/book.describe",
+              "POST /v1/contact.list",
+              "POST /v1/contact.describe",
+              "POST /v1/contact.create",
+              "POST /v1/contact.update",
+              "POST /v1/contact.delete"
+            ]
+          },
+          {
+            "group": "Attachments",
+            "pages": [
+              "POST /v1/part.describe",
+              "POST /v1/blob.create",
+              "POST /v1/blob.describe",
+              "POST /v1/blob.update",
+              "POST /v1/blob.delete"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "POST /v1/watch"
+            ]
+          },
+          {
+            "group": "Health",
+            "pages": [
+              "POST /v1/health"
+            ]
+          }
+        ]
       }
     ]
   },
@@ -140,7 +236,8 @@
     { "source": "/quickstart", "destination": "/guides/quickstart" },
     { "source": "/pricing", "destination": "/platform/billing" },
     { "source": "/platform/namespaces", "destination": "/semantik/namespaces" },
-    { "source": "/references/semql/query-language", "destination": "/semantik/query-language" }
+    { "source": "/references/semql/query-language", "destination": "/semantik/query-language" },
+    { "source": "/guides/choose-a-capability", "destination": "/semantik/search-or-subscribe" }
   ],
   "footer": {
     "socials": {

@@ -1,0 +1,44 @@
+---
+title: "Bud FAQ"
+description: "What Bud is, what it is not, and what the preview does today."
+---
+
+## Is Bud a bulk sender?
+
+No. Every mailbox has hard sending ceilings: a limit per hour, per day, and on how many distinct or new recipients it can write to. Those limits exist to keep one mailbox from spraying mail, not to be raised for volume. If you need to send newsletters or broadcast mail, use a marketing email service; Bud is for one agent's own correspondence.
+
+## Is it a shared company inbox?
+
+No. Every mailbox belongs to exactly one agent. If several agents need to see the same correspondence, grant them read access to that one mailbox rather than routing replies into a pooled inbox.
+
+## Can I open the agent's mailbox in Outlook or another mail client?
+
+No. There is no IMAP, CalDAV or CardDAV endpoint. Reading and organizing the mailbox happens through Bud's API, not a mail client.
+
+## Does Bud pick meeting times?
+
+No. Bud reports free/busy for the calendars your key can read. Choosing which slot to propose or accept is the agent's decision; Bud only tells it what's open.
+
+## Should agents talk to each other over Bud?
+
+No. Mail is too slow for agents coordinating as they work; use [Semantik](/semantik/overview) when agents need to reach each other.
+
+## Can mail reach my agent?
+
+No. Mail from outside your account can't reach an agent's address. Calendar invitations are mail too, so an invitation sent from outside doesn't arrive either.
+
+## Can my agent send mail?
+
+Not in the preview. A send is accepted and billed, but it isn't delivered to anyone, inside your account or outside it.
+
+## Can my agent raise its own limits?
+
+No. Limits are readable by the agent (`me.describe` returns the ceilings), but not changeable by it. Each send reports what remains of a limit in its `remaining` field. A mailbox's limits are raised per mailbox on request; contact [support](https://www.noetive.io/support).
+
+## What am I billed for?
+
+"Bud Requests" and "Bud Messages Sent." A message is billed once Bud accepts it, whether or not it is delivered. Receiving mail is free, and there is no charge per mailbox. See [Billing](/platform/billing) and [Bud pricing](https://www.noetive.io/bud/pricing).
+
+## How do I get notified of new mail?
+
+Open the `watch` stream over Server-Sent Events. It reports mail events for the agent's mailboxes the key can read, and it's self-service. Delivery to a webhook endpoint instead is arranged through [support](https://www.noetive.io/support).

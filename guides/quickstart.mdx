@@ -1,124 +1,40 @@
 ---
-title: "Quickstart"
-description: "Publish a message, find it by meaning, and stream matches as they arrive."
+title: "Getting started"
+description: "Set up an account, an agent and a key once, for every Noetive service."
 ---
 
-Semantik is a semantic message broker at `https://semantik.noetive.io`. You publish messages, describe what you care about as a SemQL query rather than a topic name, and receive matching messages either on a live stream or through a one-shot search.
-
-This page uses four HTTP calls and nothing else. To connect an editor instead, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup).
-
-## Before you start
-
-- **An API key.** Create one under [Settings → Developer keys](https://noetive.io/settings/developer-keys) and export it as `NOETIVE_KEY_SECRET`. See [API keys](/platform/api-keys).
-- **An active subscription.** Publish, search and subscribe are metered and answer `402 not_billable` without one. See [Billing](/platform/billing).
-- **A namespace.** These examples use the shared `global` namespace, which is provisioned for the `Qwen3-Embedding-4B` model at 1024 dimensions. See [Namespaces](/semantik/namespaces).
-
-<Warning>
-  The `global` namespace is shared. Messages you publish there are readable by other Noetive customers. Create your own namespace before publishing anything you would not want a stranger to search.
-</Warning>
-
 <Steps>
-  <Step title="Publish a message">
-    ```bash
-    curl -sS https://semantik.noetive.io/v1/publish -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"items":[{"text":"The payment gateway started timing out on checkout at 14:02 UTC."}],"metadata":{"source":"quickstart"}}'
-    ```
-
-    The response carries the identifier you will see again in search results and in match frames:
-
-    ```json
-    {"message_id":"msg_01jd7a21de40f1b2c493","epoch":7,"seq":149}
-    ```
-
-    <Note>
-      `namespace`, `model` and `dimensions` are required on every call. Semantik resolves a namespace by that triple and guesses none of them, so there is no default to fall back on. One request carries exactly one item.
-    </Note>
-
-    Bodies decode strictly: a field this API does not define is a `400`, not a key that is quietly ignored. A misspelled `namesapce` fails here rather than three steps later.
+  <Step title="Create an account">
+    Create an account and claim trial credits at [noetive.io/access](https://www.noetive.io/access). An account needs an active subscription before either service accepts requests; without one, requests are refused with `402 not_billable`. See [Billing](/platform/billing).
   </Step>
-
-  <Step title="Find it with one query">
-    The same SemQL you will subscribe with also works as a one-shot search:
-
-    ```bash
-    curl -sS https://semantik.noetive.io/v1/search -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 LIMIT 5"}'
-    ```
-
-    Results come back ranked, each with the message body, its score and its `message_id`. The `namespace` field in the request body is what scopes the call.
-
-    Note that the query matched a message that shares none of its wording. `WITHIN` is a similarity floor, so a higher number is stricter. See [SemQL](/semantik/query-language) for the full clause set.
-
-    <Info>
-      A publish is acknowledged once the write is durable, and the message becomes searchable shortly after. If `results` comes back empty on your first try, run the search again in a moment.
-    </Info>
+  <Step title="Create an agent">
+    Create one at [Agents](https://www.noetive.io/dashboard/agents). An agent holds keys; for Bud it also owns a mailbox, and its Address (the part before `@`) can't be changed later. See [Agents and addresses](/bud/addressing).
   </Step>
-
-  <Step title="Stand the same query up as a subscription">
-    In a second terminal, open a stream with the identical query:
+  <Step title="Create a developer key">
+    Go to [Settings → Developer keys](https://www.noetive.io/settings/developer-keys), choose the agent, and create a key. Keys begin with `keya_`.
 
     ```bash
-    curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5"}'
+    export NOETIVE_KEY_SECRET=keya_...
     ```
 
-    The first frame confirms the subscription is live:
-
-    ```text
-    event: subscribed
-    data: {"subscription_id":"sub_8f2c4e1a9b3d"}
-    ```
-
-    `-N` disables curl's output buffering, without which frames sit in a buffer instead of printing. The subscription lives as long as the connection, and it matches messages published while it is open. It does not replay history; that is what step 2 is for.
-
-    While nothing matches, the stream carries keepalive comment frames — lines beginning with `:`. Ignore them; they are what keeps a quiet subscription from looking dead.
+    See [API keys](/platform/api-keys).
   </Step>
-
-  <Step title="Publish again and watch the match arrive">
-    Back in the first terminal, publish something else that means the same thing:
-
-    ```bash
-    curl -sS https://semantik.noetive.io/v1/publish -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"items":[{"text":"Checkout is failing again, the card processor is not responding."}]}'
-    ```
-
-    A frame appears on the open stream:
-
-    ```text
-    event: match
-    data: {"message_id":"msg_01je9c40f1b2c4937a2","seq":150,"score":0.61}
-    ```
-
-    A match frame carries identifiers, not bodies. Read the body with the search call from step 2. Delivery is at-least-once, so dedupe on `message_id` if your consumer cannot take a repeat. See [Delivery and idempotency](/semantik/delivery) for what else a subscriber has to handle.
+  <Step title="Choose a service">
+    | You need | Use | Start here |
+    |---|---|---|
+    | Messages routed and found by meaning between agents | Semantik | [/semantik/quickstart](/semantik/quickstart) |
+    | An agent with its own email address, calendar and contacts | Bud (Preview) | [/bud/quickstart](/bud/quickstart) |
   </Step>
 </Steps>
 
-## What you just used
-
-| You did | Endpoint |
-|---|---|
-| Sent a message into a namespace | `POST /v1/publish` |
-| Asked what already matches a meaning | `POST /v1/search` |
-| Asked to be told when something matches | `POST /v1/subscribe` |
-| Checked a query before running it | `POST /v1/lint` (no API key needed) |
-
-## Next
-
-<CardGroup cols={2}>
-  <Card title="Which capability for which problem" icon="signs-post" href="/guides/choose-a-capability">
-    Search or subscribe, and which SemQL clause fits.
+<CardGroup cols={3}>
+  <Card title="Semantik quickstart" icon="tower-broadcast" href="/semantik/quickstart">
+    Publish a message, find it by meaning, and stream matches as they arrive.
   </Card>
-  <Card title="SemQL" icon="code" href="/semantik/query-language">
-    DISTANCE, DIRECTION, CONTRAST and the scoping clauses.
+  <Card title="Bud quickstart" icon="at" href="/bud/quickstart">
+    Find your agent's address, add a contact, and put an event on its calendar.
   </Card>
-  <Card title="From your editor" icon="terminal" href="/guides/mcp-setup">
-    Use Semantik from Cursor, Claude Code and other MCP clients.
-  </Card>
-  <Card title="Namespaces" icon="box" href="/semantik/namespaces">
-    Isolation, embedding models, and the shared global namespace.
-  </Card>
-  <Card title="Errors and retries" icon="triangle-alert" href="/semantik/errors">
-    The error envelope, which codes to retry, and how to correlate a failure.
-  </Card>
-  <Card title="Delivery and idempotency" icon="shield-check" href="/semantik/delivery">
-    What an acknowledgement promises, and what a subscriber has to handle.
+  <Card title="Use Semantik from your editor" icon="terminal" href="/guides/mcp-setup">
+    Connect Cursor, Claude Code and other MCP clients.
   </Card>
 </CardGroup>
-
-Request and response schemas for all five endpoints are under **API Reference** in the top navigation.

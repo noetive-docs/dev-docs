@@ -1,0 +1,92 @@
+---
+title: "Errors"
+description: "The error envelope, which codes are worth retrying, and how to correlate a failure with a server log line."
+---
+
+Every refusal is a JSON object with an `error` member, at the HTTP status the code maps to. The status is the part to branch on; the code is the part to branch within.
+
+```json
+{
+  "error": {
+    "code": "precondition_failed",
+    "message": "someone else wrote first",
+    "request_id": "1-68b4c2a1-3f9d2e4b8c1a7f0e5d3b2a91",
+    "version": "7"
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `code` | Stable code to branch on. Never parse `message` |
+| `message` | What went wrong, in one sentence. Wording can change |
+| `hint` | What to do about it, when there is a concrete next step |
+| `field` | A JSON pointer to the offending field, on `invalid` |
+| `request_id` | Correlates this refusal with everything the request caused, also on the `X-Request-Id` header |
+| `retry_after_ms` | How long to wait before retrying, on `rate_limited` |
+| `version` | The version to retry with, on `precondition_failed` |
+
+## Which errors to retry
+
+| Code | Status | Meaning | Retry? |
+|---|---|---|---|
+| `invalid` | 400 | The request is malformed or a field is wrong. `field` is a JSON pointer to it | No. Fix the request |
+| `unauthorized` | 401 | The credential is missing, unknown, revoked or expired | No. Stop presenting the key |
+| `not_billable` | 402 | The credential is good and the account behind it cannot incur usage | No. Resolve billing first |
+| `forbidden_scope` | 403 | The credential is valid and does not reach this object, or does not reach an agent on this service at all | No. The key is fine; its reach is not |
+| `not_found` | 404 | No such object, or no such operation | No. Check the reference |
+| `precondition_failed` | 409 | Someone else wrote first, or a version was needed and not sent. `version` is the value to retry with | Yes. Read the object again, then retry against what is stored now |
+| `policy_refused` | 422 | A policy declined. The message says which | No. Change the request |
+| `rate_limited` | 429 | A limit is spent. `retry_after_ms` says how long to wait | Yes, after `retry_after_ms` |
+| `paused` | 503 | The mailbox is paused and is not sending | No. This is a decision about the mailbox, not a transient failure |
+| `upstream_unavailable` | 503 | Something this request needed did not answer | Yes, with backoff |
+| `unavailable` | 501 | This deployment does not implement the operation | No. Only a new deployment adds it |
+| `internal` | 500 | Something went wrong that is not about the request | No. Quote `request_id` to support |
+
+`paused` and `upstream_unavailable` can share a status on the same operation. The `code` member is what tells them apart, so branch on the status first and on the code within it.
+
+`unavailable` is 501 rather than 500 so that a retry policy written against statuses does not retry it.
+
+## Only 401 means the key is the problem
+
+Four codes can look like a key problem, and only one of them is.
+
+Treat 401 as "this key doesn't work": stop presenting it. `forbidden_scope`, `not_billable` and `upstream_unavailable` all mean the key itself is fine: it reaches no agent here, or the account cannot currently incur usage, or something the request needed did not answer. Reacting to those by discarding the key throws away a working credential and gets no further.
+
+`WWW-Authenticate` is sent with 401 and with no other status, so its presence is a reliable test for "the credential is the problem" if that's easier to branch on than the status code.
+
+`upstream_unavailable` is the one worth retrying. It is transient by definition, and the request had no effect.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Request body | 1 MiB, or 16 MiB for a blob create carrying its bytes inline |
+| JSON nesting depth | 64 |
+
+A body over either limit is refused as `invalid` with the same JSON envelope as any other refusal, not a bare transport error, so one error path covers size and shape alike.
+
+## Concurrency
+
+An operation that changes a stored object takes a `version` and returns the new one. Supplying the version you read is what makes an update a compare-and-swap.
+
+Omitting `version` for an object that already exists is `precondition_failed`, the same as a lost race, and both carry `version`, the value to retry with.
+
+There is one exception without compare-and-swap: `message.update` changes read state, labels and folder without a version, and its `labels` replace the message's labels whole, so two agents labelling one message at once keep only the last write.
+
+## Idempotency
+
+`send` and the create, update and delete operations accept `idempotency_key`. A repeat with the same key returns the first attempt's result rather than doing the work again. A repeat that arrives while the first attempt is still running is refused as `rate_limited`, with `retry_after_ms` saying when to ask again. A key belongs to the agent that sent it, and a refused or failed attempt does not spend it.
+
+| Operation | A repeat with the same key |
+|---|---|
+| `send` | Returns the first send's result for seven days, through restarts, deployments and outages |
+| Every other write | Recognized on a best-effort basis for up to an hour |
+
+Outside `send`, a key can be forgotten sooner: after a service interruption, or while the service is under heavy load. A forgotten key does the work again, exactly as if no key had been sent; it never returns the result of a different request. Treat the key as protection against the retry you make straight after a timeout, and make a retried create safe to repeat: read before retrying, or delete the extra object.
+
+A key names one request. Reusing it for a different request is refused as `invalid`, on create, update and delete.
+
+## Correlating a failure
+
+Every response, successful or not, carries an `X-Request-Id` header, and a refusal repeats the same value as `error.request_id`. Quote it in a support request: it correlates the refusal with everything the request caused.

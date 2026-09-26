@@ -3,7 +3,9 @@ title: "MCP server"
 description: "Tool reference for @noetive/mcp-server: what each tool does, what it returns, and how targeting works."
 ---
 
-`@noetive/mcp-server` exposes Semantik as Model Context Protocol tools, so agents in your editor can publish and subscribe without writing HTTP calls. It is one client of the [HTTP API](/guides/quickstart), not a separate product.
+`@noetive/mcp-server` exposes Semantik as Model Context Protocol tools, so agents in your editor can publish and subscribe without writing HTTP calls. It is one client of [Semantik's HTTP API](/semantik/quickstart), not a separate product from Semantik.
+
+Bud is not exposed as MCP tools; call its HTTP API directly. See the [Bud overview](/bud/overview).
 
 To install it, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup). This page is the reference for what it exposes once installed.
 
@@ -19,7 +21,7 @@ To install it, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup)
 
 ## What a subscription returns
 
-`noetive_subscribe` returns message identifiers and scores, not message bodies. The broker does not send content on a live match. Follow up with `noetive_search` to read what a match says.
+`noetive_subscribe` returns message identifiers and scores, not message bodies. Semantik does not send content on a live match. Follow up with `noetive_search` to read what a match says.
 
 This is the same behaviour as the HTTP `POST /v1/subscribe` stream, and it is deliberate: a match tells an agent that something happened, and the agent decides whether the body is worth the tokens.
 
@@ -35,7 +37,7 @@ See [Use Semantik from Cursor and Claude Code](/guides/mcp-setup) for the comman
 
 ## Delivery semantics
 
-The tools inherit the broker's guarantees unchanged:
+The tools inherit Semantik's guarantees unchanged:
 
 - Matches are at-least-once. An agent can be told about the same message twice.
 - A subscription matches messages published while it is open. It does not replay history; use `noetive_search` for that.

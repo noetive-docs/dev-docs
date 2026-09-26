@@ -4,9 +4,7 @@ sidebarTitle: "From your editor"
 description: "Install the Noetive MCP server so agents in your editor can publish, search and subscribe without writing HTTP calls."
 ---
 
-The Model Context Protocol server is one client of the [HTTP API](/guides/quickstart). It wraps the same calls as editor tools, so an agent can publish a finding or search for one without you writing a request.
-
-Nothing here is required to use Semantik. If you are building a service rather than working in an editor, start with the [Quickstart](/guides/quickstart) instead.
+The Model Context Protocol server is one client of [Semantik's HTTP API](/semantik/quickstart). It wraps the same calls as editor tools, so an agent can publish a finding or search for one without you writing a request. This page covers Semantik only, and is not required to use it; if you are building a service rather than working in an editor, start with the [Quickstart](/semantik/quickstart) instead. Bud is not exposed as MCP tools; call its HTTP API directly, see the [Bud overview](/bud/overview).
 
 <Info>
   `npx` requires Node.js 18 or later. Run `node --version` to check. If Node.js is not installed, download it from [nodejs.org](https://nodejs.org).
@@ -55,7 +53,7 @@ Nothing here is required to use Semantik. If you are building a service rather t
 
   <Tab title="Kiro">
     ```bash
-    npx @noetive/mcp-server init --client kiro --api-key keyu_...
+    npx @noetive/mcp-server init --client kiro --api-key keya_...
     ```
 
     Kiro does not expand environment variables in its MCP config, so the key is written into the file directly. See the note below.
@@ -66,7 +64,7 @@ Nothing here is required to use Semantik. If you are building a service rather t
     npx @noetive/mcp-server init --client hermes
     ```
 
-    Run this in a terminal. Hermes keeps everything — servers, model, profiles, approvals — in one `~/.hermes/config.yaml`, so the installer goes through `hermes mcp add` rather than editing that file. That command asks which tools to enable, so without a terminal to answer it the install stops and prints the block to paste instead. Afterwards, `/reload-mcp` picks it up in an open session and `hermes mcp list` shows it.
+    Run this in a terminal. Hermes keeps everything (servers, model, profiles, approvals) in one `~/.hermes/config.yaml`, so the installer goes through `hermes mcp add` rather than editing that file. That command asks which tools to enable, so without a terminal to answer it the install stops and prints the block to paste instead. Afterwards, `/reload-mcp` picks it up in an open session and `hermes mcp list` shows it.
   </Tab>
 </Tabs>
 
@@ -74,10 +72,10 @@ Registry-aware clients can install it by name instead: `io.noetive/mcp-server`.
 
 ## Set your API key
 
-The server reads its key from `NOETIVE_KEY_SECRET`. Create one under [Settings → Developer keys](https://noetive.io/settings/developer-keys) and export it in the environment your editor launches from:
+The server reads its key from `NOETIVE_KEY_SECRET`. Create one under [Settings → Developer keys](https://www.noetive.io/settings/developer-keys) and export it in the environment your editor launches from:
 
 ```bash
-export NOETIVE_KEY_SECRET=keyu_...
+export NOETIVE_KEY_SECRET=keya_...
 ```
 
 `init` writes a reference to that variable rather than the key itself, so the secret stays out of a config file that gets synced or committed. Kiro and Codex are the exceptions: neither expands variables, so `--api-key` writes the literal value and tightens the file mode. Hermes does expand it, and resolves it from `~/.hermes/.env` before the environment it was launched in.
@@ -130,7 +128,7 @@ The install touches one key in your editor's config and backs the file up first.
   <Card title="MCP tool reference" icon="wrench" href="/references/ai-tools/mcp">
     What each tool does and what it returns.
   </Card>
-  <Card title="Quickstart" icon="rocket" href="/guides/quickstart">
+  <Card title="Quickstart" icon="rocket" href="/semantik/quickstart">
     The four HTTP calls the tools wrap.
   </Card>
 </CardGroup>

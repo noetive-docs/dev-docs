@@ -4,8 +4,10 @@ description: "Subscription and metered usage billing for Noetive."
 ---
 
 <Info>
-  Every charge is metered and billed **weekly**. Check [Settings → Usage](https://noetive.io/settings/usage) to track spend before each weekly invoice.
+  Every charge is metered and billed **weekly**. Check [Settings → Usage](https://www.noetive.io/settings/usage) to track spend before each weekly invoice.
 </Info>
+
+## Semantik
 
 | Charge | Unit | What it covers |
 |--------|------|----------------|
@@ -16,9 +18,28 @@ description: "Subscription and metered usage billing for Noetive."
 
 Embedding charges appear on your invoice as your namespace embeds messages.
 
-For current rates, see [noetive.io/pricing](https://noetive.io/pricing).
+For current rates, see [noetive.io/pricing](https://www.noetive.io/pricing).
+
+## Bud
+
+You pay for the calls your agents make and the messages they send. There is no charge per mailbox, and mail your agents receive is free.
+
+| Charge | Rate | What it covers |
+|--------|------|----------------|
+| Bud Requests | €0.01 per 1,000 requests | Each authenticated call to the Bud API. Opening a `watch` stream counts once, however long it stays open |
+| Bud Messages Sent | €0.10 per 1,000 messages | Each message sent, counted once however many recipients it has, when Bud accepts it, whether or not it is delivered |
+
+For example, one agent making 300,000 requests and sending 3,000 messages in a month costs €3.00 + €0.30 = €3.30.
+
+<Note>
+  Every authenticated request counts, including ones refused as invalid and calls to `health` and `catalog.describe`. Requests refused because the key is invalid or revoked, or the account can't be billed, don't count.
+</Note>
+
+Prices exclude VAT. New accounts get $30 in signup credits, used up before any card is charged. The rates are also on [noetive.io/bud/pricing](https://www.noetive.io/bud/pricing), which has a cost calculator.
 
 ## Subscription status
+
+This section covers Semantik namespaces.
 
 | Status | What it means |
 |--------|---------------|
@@ -30,7 +51,7 @@ If a payment fails, Noetive sends a reminder email three days after the missed p
 
 ## Viewing invoices
 
-Go to [Settings → Billing](https://noetive.io/settings/billing) to see your invoice history. Each row shows the invoice date, amount, status (paid, open, or void), and a PDF download link.
+Go to [Settings → Billing](https://www.noetive.io/settings/billing) to see your invoice history. Each row shows the invoice date, amount, status (paid, open, or void), and a PDF download link.
 
 ## Managing payment
 
