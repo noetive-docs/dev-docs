@@ -5,13 +5,15 @@ description: "Developer credentials for programmatic access to Noetive."
 
 API keys authenticate programmatic requests to Noetive. The MCP server uses an API key to connect your editor to Semantik on your behalf. One key reaches both Semantik and Bud. Keys begin with `keya_`.
 
-Every key belongs to an **agent**. The agent decides which namespaces the key can reach, so two keys on the same account can have different access. Rotating a key does not change what its agent reaches, and narrowing an agent applies to every key it holds.
+A key acts as an **agent**. The agent decides what the key can reach: which namespaces in Semantik, and what it may do with its own mail and calendar in Bud. Each agent acts through one key at a time. You can move a key between agents or replace it without changing what the agent reaches.
+
+Manage both at [Agents](https://www.noetive.io/dashboard/agents).
 
 ## Agents
 
-This is how a key is scoped in Semantik. An agent is whatever holds a key: a bot, a service, an editor. Manage them at [Agents](https://www.noetive.io/dashboard/agents).
+An agent is a bot, a service or an editor that acts on your behalf.
 
-An agent reaches either:
+In Semantik, an agent reaches either:
 
 - **all your namespaces**, including ones you create later, or
 - **only the namespaces you pick**.
@@ -19,18 +21,18 @@ An agent reaches either:
 The shared `global` namespace is a separate choice, so an agent can work entirely inside your own namespaces without touching it.
 
 <Tip>
-  Give each thing that holds a key its own agent. A leaked key then costs you that agent's namespaces rather than the whole account, and you can stop it without disturbing anything else.
+  Give each thing that holds a key its own agent. A leaked key then costs you that agent's reach rather than the whole account, and you can stop it without disturbing anything else.
 </Tip>
 
-Disabling an agent stops every key it holds. Deleting one requires revoking its keys first, so you see what you are about to break.
+Disabling an agent stops its key. Deleting an agent detaches its key and, unless you untick the option, revokes it.
 
 If a namespace an agent was scoped to is deleted, the agent quietly reaches less than it did. The Agents page says so rather than leaving you to find out from a failing request.
 
 ### In Bud
 
-The same key reaches its agent's own mailbox, calendar, and address book in Bud. The agent's mailbox is set up on the key's first request to Bud. A key must belong to an agent to reach Bud.
+The key reaches its agent's own mailbox, calendar and address book in Bud. The agent's mailbox is set up on the key's first request to Bud.
 
-Bud scopes are fixed (`mail`, `cal`, `book`, `blob`, `approve`, `freebusy`), with no picker. Reaching another agent's objects needs a grant, and access never crosses your account.
+Choose what each agent may use under **Mail and calendar**: `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
 
 ## Creating a key
 
@@ -38,24 +40,31 @@ Bud scopes are fixed (`mail`, `cal`, `book`, `blob`, `approve`, `freebusy`), wit
   The full key value is shown only once, immediately after creation. Copy it before navigating away: you cannot retrieve it again.
 </Warning>
 
-1. Go to [Settings → Developer keys](https://www.noetive.io/settings/developer-keys).
-2. Choose the **agent** the key belongs to. If you have none yet, create one at [Agents](https://www.noetive.io/dashboard/agents) first.
-3. Select **Create key**.
-4. Choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
-5. Copy the key immediately.
+From an agent's card on [Agents](https://www.noetive.io/dashboard/agents):
 
-After creation, the key appears in the list with only the first and last characters visible.
+1. Open **Give this agent a key**.
+2. Name the key and choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
+3. Select **Create key** and copy the key immediately.
 
-## Constraints
+You can also create a key under **Keys** without choosing an agent. It reaches nothing until you attach it, which is useful when you want to hand out a credential before deciding what it may do.
 
-| Property | Value |
-|----------|-------|
-| Format | Begins with `keya_` |
-| Expiration options | Never, 30 days, 90 days, 1 year |
-| Display after creation | Shown once; first and last characters only thereafter |
-| Semantik namespaces reached | Whatever the key's agent reaches |
-| Keys per agent | No limit. Issue a second to rotate without downtime |
-| Bud scopes | Fixed: `mail`, `cal`, `book`, `blob`, `approve`, `freebusy` |
+## Attaching and detaching
+
+An agent with no key shows **Or attach a key you already have** under **Give this agent a key**. Pick any live key that is not attached to an agent.
+
+**Detach** releases a key from its agent without revoking it. Anything using the key stops reaching that agent's namespaces and mailbox until you attach it again. To move a deployed key to a different agent without redeploying the secret, detach it, then attach it from the other agent's card.
+
+Changes take effect within about a minute.
+
+## Rotating a key
+
+Select **Rotate key** on the agent's card and choose how long the current key keeps working: **1 hour**, **24 hours**, **7 days**, or **Stop it now**. The agent immediately gains a new key, which is shown once. The previous key keeps working for the period you chose, then stops, so you can deploy the new value without downtime.
+
+The previous key is listed on the agent's card until then, with **Revoke now** if you finish early. Rotating never extends a key: one already due to expire sooner keeps its date.
+
+## Keys with a new value
+
+If a key under **Keys** shows **Show current value**, its format was updated. Copy the new value into whatever uses the key. The value you had keeps working until the old format is retired; if that old value may have leaked, contact support rather than relying on revoking the key.
 
 ## Revoking a key
 
@@ -63,10 +72,22 @@ After creation, the key appears in the list with only the first and last charact
   Revoking a key is irreversible. If the MCP server is using the revoked key, reconnect it with a new key.
 </Warning>
 
-Select **Revoke** next to any key in [Settings → Developer keys](https://www.noetive.io/settings/developer-keys). New requests to both Semantik and Bud are refused within about a minute. In Semantik, subscriptions that were already open are also disconnected rather than left streaming.
+Select **Revoke** next to any key under **Keys**, then **Revoke key**. New requests to both Semantik and Bud are refused within about a minute. In Semantik, subscriptions that were already open are also disconnected rather than left streaming.
 
-To stop everything an agent can do at once, disable the agent instead. That takes effect on the same timescale and does not destroy the keys, so you can turn it back on.
+To stop everything an agent can do at once, disable the agent instead. That takes effect on the same timescale and does not destroy its key, so you can turn it back on.
 
-To rotate without downtime: issue a second key for the same agent, move your service onto it, then revoke the first.
+## Constraints
+
+| Property | Value |
+|----------|-------|
+| Format | Begins with `keya_` |
+| Expiration options | Never, 30 days, 90 days, 1 year |
+| Display after creation | Shown once; first characters only thereafter |
+| Keys per agent | One, plus the previous key during a rotation's grace period |
+| Agents per key | One |
+| Keys per account that are not revoked | 50 |
+| Rotation grace period | 1 hour, 24 hours, 7 days, or none |
+| Semantik namespaces reached | Whatever the key's agent reaches; nothing while unattached |
+| Bud scopes | Chosen per agent from `mail`, `cal`, `book`, `blob`, `approve`, `freebusy` |
 
 Store keys in environment variables or a secrets manager. Do not commit them to source control.

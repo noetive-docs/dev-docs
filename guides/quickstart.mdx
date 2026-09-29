@@ -8,10 +8,10 @@ description: "Set up an account, an agent and a key once, for every Noetive serv
     Create an account and claim trial credits at [noetive.io/access](https://www.noetive.io/access). An account needs an active subscription before either service accepts requests; without one, requests are refused with `402 not_billable`. See [Billing](/platform/billing).
   </Step>
   <Step title="Create an agent">
-    Create one at [Agents](https://www.noetive.io/dashboard/agents). An agent holds keys; for Bud it also owns a mailbox, and its Address (the part before `@`) can't be changed later. See [Agents and addresses](/bud/addressing).
+    Create one at [Agents](https://www.noetive.io/dashboard/agents). An agent acts through one key; for Bud it also owns a mailbox, and its Address (the part before `@`) can't be changed later. See [Agents and addresses](/bud/addressing).
   </Step>
   <Step title="Create a developer key">
-    Go to [Settings → Developer keys](https://www.noetive.io/settings/developer-keys), choose the agent, and create a key. Keys begin with `keya_`.
+    On your agent's card at [Agents](https://www.noetive.io/dashboard/agents), select **Give this agent a key**. Keys begin with `keya_`.
 
     ```bash
     export NOETIVE_KEY_SECRET=keya_...
