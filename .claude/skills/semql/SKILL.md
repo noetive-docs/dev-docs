@@ -66,7 +66,7 @@ MATCH DIRECTION(["payment processing", "transaction"]) CONE 0.4
         ATTRACT ["failure", "error", "timeout"],
         REPEL   ["success", "completed", "processed"]
       )
-  AND DISTANCE("intermittent drops under load") WITHIN 0.65
+  AND DISTANCE("intermittent drops under load")
 ```
 
 This says: thematically about payments (DIRECTION), specifically the failure/error side (CONTRAST), and close to the specific pattern of intermittent drops (DISTANCE). Each clause eliminates a different kind of noise.
@@ -85,23 +85,26 @@ MATCH (
 
 This watches for two distinct failure modes that might have the same downstream impact.
 
-### 3. Tune cone angles and similarity floors
+### 3. Tune cone angles, not thresholds
 
-These numerical parameters control precision vs recall:
+**There is no similarity threshold to tune.** Semantik sets the relevance bar itself, per clause: a clause holds for a message only when the message is closer to it than general reference text is. `A AND B` matches only when each clause holds on its own; a strong match on one does not make up for the other. Clauses of one kind ORed together (`A OR B OR C`, all DISTANCE, say) share one bar measured on the group as a whole, which rises with the group's breadth. Clauses of different kinds in one OR (DISTANCE, DIRECTION, CONTRAST) each keep their own bar, so a CONTRAST branch still fires next to DISTANCE branches. To match less, write more specific anchor text; to match more, `OR` in another anchor of similar specificity: anchors of one kind ORed together share one bar, so ORing in a much broader anchor raises the bar for the narrower ones and can drop their marginal matches. `CONE` can only tighten: a message must be inside the cone and above the bar, so a cone wider than the bar changes nothing.
 
-| Parameter | Small value | Large value |
-|---|---|---|
-| `CONE` (radians) | Narrow focus (0.1–0.2), high precision | Broad sweep (0.5–0.8), high recall |
-| `WITHIN` (cosine similarity floor, 0–1) | Loose match (0.4–0.6), general vicinity | Tight match (0.8–0.9), near-exact semantics |
+SemQL has a `WITHIN` modifier, but Semantik refuses it: a query that sets `WITHIN` on any clause (DISTANCE or CONTRAST, text or JSON `within`) gets `400 invalid_request` from `/v1/search` and `/v1/subscribe`, and `/v1/lint` reports it as an error. Never use it in docs examples.
 
-`WITHIN` is a **minimum similarity floor**: a candidate passes when its cosine similarity to the anchor is at least the given value. Larger value = stricter neighbourhood. `WITHIN 0` means no floor (every score survives the per-clause gate).
+The one numeric knob is `CONE` on `DIRECTION` (radians; lower is tighter).
 
 **Starting points for common use cases:**
 
-- Monitoring a specific known pattern: `CONE 0.2`, `WITHIN 0.75`
-- Broad topical surveillance: `CONE 0.5`, no `WITHIN`
-- Duplicate/near-duplicate detection: `DISTANCE` only, `WITHIN 0.9`
-- Concept separation (like X not Y): `CONTRAST` with `WITHIN 0.7`
+- Monitoring a specific known pattern: `CONE 0.2` plus a specific `DISTANCE` anchor
+- Broad topical surveillance: `CONE 0.5`
+- Near-duplicate detection: `DISTANCE` with a specific anchor
+- Concept separation (like X not Y): `CONTRAST`
+
+### 3b. NOT, and groups for one owner per message
+
+`NOT` is supported only directly under an `AND` that also has a positive clause. `A AND NOT DISTANCE("x")` excludes messages closer to x than general reference text is; the `NOT` only filters and does not raise the score. Anywhere else (`A OR NOT B`, `NOT A AND NOT B`, `A AND (B OR NOT C)`) the query is refused with `400 invalid_request`, because it would match nearly every message.
+
+Several subscriptions that subscribe with the same `group` name (1–64 of letters, digits, `-`, `_`) share a stream: a message matching several members goes only to the highest-scoring one, and grouped match frames carry `lead`, the margin over the best other matching member. Members must match on the same clause kinds (DISTANCE, DIRECTION, CONTRAST; clauses under `NOT` ignored); a subscription whose kinds differ from the group's current members is refused with `400 invalid_request`. For DISTANCE the members must also use the same metric (mixing metrics is refused like mixing kinds). Write members in the same shape as well: an AND member scores the mean of its clauses and an OR member the best, so an AND member loses to an OR member it would otherwise tie. Groups belong to the account, so every API key on the account shares its group names and another account's identically named group never competes with yours. For a role, use a few short anchors in the words its messages use, plus one OR'd sentence stating what the role is responsible for.
 
 ### 4. Use NAMESPACE to control scope, not semantics
 
@@ -151,7 +154,7 @@ When a user describes what they want to monitor, follow this process:
 3. **Identify scope** — which namespaces, what time window, what volume limit?
 4. **Choose clause types** — map each aspect to the right geometric primitive.
 5. **Compose with AND/OR/NOT** — combine clauses to sculpt the region.
-6. **Set numerical parameters** — tune cone angles and similarity floors.
+6. **Set numerical parameters** — tune cone angles; there is no similarity floor to set.
 7. **Write both formats** — provide text and JSON.
 8. **Explain the query** — describe what each clause does and why it's there.
 
@@ -169,8 +172,9 @@ When writing SemQL, always structure your response as:
 Read `references/patterns.md` for the full catalog. The most frequent mistakes:
 
 - **DIRECTION without CONTRAST** — too broad, matches anything topically adjacent
-- **DISTANCE with too-low `within`** — a floor <0.5 lets almost anything pass, giving a false sense the query is filtered
+- **Setting `WITHIN`** — Semantik refuses it with `400 invalid_request`; make the anchor more specific, or `OR` in another anchor of similar specificity, instead
 - **CONTRAST with overlapping attract/repel** — concepts that are semantically close in both lists cancel out
 - **Missing NAMESPACE** — queries against the global namespace when they meant org-private
 - **NOT applied to the wrong level** — `NOT DISTANCE(x) AND DIRECTION(y)` negates only the distance, not both (operator precedence: NOT binds tighter than AND)
+- **NOT anywhere but directly under an AND with a positive clause** — `A OR NOT B`, `NOT A AND NOT B` and `A AND (B OR NOT C)` are refused with `400 invalid_request`
 - **Single-clause queries** — almost always too broad; suggest adding a second clause

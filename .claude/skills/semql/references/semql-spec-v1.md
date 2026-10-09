@@ -25,6 +25,8 @@ duration    = integer ( "s" | "m" | "h" | "d" | "w" )
 
 Operator precedence: NOT (tightest) > AND > OR (loosest).
 
+The grammar has `WITHIN` because SemQL is shared by other hosts; Semantik refuses it. `NOT` is supported only directly under an `AND` that also has a positive clause: `A AND NOT DISTANCE("x")` excludes messages closer to x than general reference text is, and the `NOT` only filters. Anywhere else (`A OR NOT B`, `NOT A AND NOT B`, `A AND (B OR NOT C)`) Semantik refuses the query with `400 invalid_request`, because it would match nearly every message.
+
 All reserved words are case-insensitive: `MATCH AND OR NOT DISTANCE DIRECTION CONTRAST ATTRACT REPEL WITHIN TOP CONE WINDOW NAMESPACE ALL GLOBAL LIMIT`.
 
 ## Clauses
@@ -34,16 +36,14 @@ All reserved words are case-insensitive: `MATCH AND OR NOT DISTANCE DIRECTION CO
 | Field | Type | Required | Default | Range |
 |---|---|---|---|---|
 | `anchor` | string or float[] | yes | — | — |
-| `within` | number | no | — | 0.0–1.0 (cosine similarity floor; 0 = no floor) |
+| `within` | number | no | — | Not accepted by Semantik (400 `invalid_request`) |
 | `top_k` | integer | no | — | ≥1 |
 | `metric` | string | no | `"cosine"` | `"cosine"`, `"euclidean"`, `"dot"` |
 
-`within` is a minimum similarity floor — a match passes when its cosine similarity to the anchor is at least `within`. Larger value = stricter neighbourhood.
+Semantik refuses `within` on every clause and sets the relevance bar itself, per clause: a clause holds for a message only when the message is closer to it than general reference text is. `A AND B` needs each clause to hold on its own; clauses of one kind ORed together share one bar measured on the group as a whole, which rises with its breadth, while clauses of different kinds in one OR each keep their own. `top_k` is accepted on search, not on subscribe, and returns the k nearest messages that also clear the bar, so it can return fewer than k.
 
-Cannot specify both `within` and `top_k`. If neither is set, the clause scores without thresholding.
-
-Text: `DISTANCE("payment failure") WITHIN 0.7`
-JSON: `{"distance": {"anchor": "payment failure", "within": 0.7}}`
+Text: `DISTANCE("payment failure")`
+JSON: `{"distance": {"anchor": "payment failure"}}`
 
 ### DIRECTION — cone in embedding space
 
@@ -52,7 +52,7 @@ JSON: `{"distance": {"anchor": "payment failure", "within": 0.7}}`
 | `toward` | string, string[], or float[] | yes | — | — |
 | `cone` | number | no | 0.3 | 0.0 (exact) to π/2 (hemisphere) |
 
-When `toward` is an array, the direction vector is the normalized mean of all embedded concepts.
+When `toward` is an array, the direction vector is the normalized mean of all embedded concepts. `CONE` can only tighten: a message must be inside the cone and above the bar, so a cone wider than the bar changes nothing.
 
 Text: `DIRECTION(["customer frustration", "billing"]) CONE 0.4`
 JSON: `{"direction": {"toward": ["customer frustration", "billing"], "cone": 0.4}}`
@@ -63,12 +63,12 @@ JSON: `{"direction": {"toward": ["customer frustration", "billing"], "cone": 0.4
 |---|---|---|---|---|
 | `attract` | string[] | yes | — | ≥1 item |
 | `repel` | string[] | no | — | ≥1 item |
-| `within` | number | no | — | 0.0–1.0 (cosine similarity floor from composite vector; 0 = no floor) |
+| `within` | number | no | — | Not accepted by Semantik (400 `invalid_request`) |
 
 Composite vector: `normalize(mean(embed(attract)) - mean(embed(repel)))` when `repel` is present; `normalize(mean(embed(attract)))` otherwise.
 
-Text: `CONTRAST(ATTRACT ["enterprise"], REPEL ["free tier"]) WITHIN 0.6`
-JSON: `{"contrast": {"attract": ["enterprise"], "repel": ["free tier"], "within": 0.6}}`
+Text: `CONTRAST(ATTRACT ["enterprise"], REPEL ["free tier"])`
+JSON: `{"contrast": {"attract": ["enterprise"], "repel": ["free tier"]}}`
 
 ## Expressions (JSON)
 
