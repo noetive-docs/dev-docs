@@ -32,7 +32,7 @@ If a namespace an agent was scoped to is deleted, the agent quietly reaches less
 
 The key reaches its agent's own mailbox, calendar and address book in Bud. The agent's mailbox is set up on the key's first request to Bud.
 
-Choose what each agent may use under **Mail and calendar**: `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
+Choose what each agent may use under **Mail and calendar** on its Edit access page: `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
 
 ## Creating a key
 
@@ -40,27 +40,26 @@ Choose what each agent may use under **Mail and calendar**: `mail`, `cal`, `book
   The full key value is shown only once, immediately after creation. Copy it before navigating away: you cannot retrieve it again.
 </Warning>
 
-From an agent's card on [Agents](https://www.noetive.io/dashboard/agents):
+From your agent's page, under **Give this agent a key**:
 
-1. Open **Give this agent a key**.
-2. Name the key and choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
-3. Select **Create key** and copy the key immediately.
+1. Name the key and choose an expiration: **Never**, **30 days**, **90 days**, or **1 year**.
+2. Select **Create key** and copy the key immediately.
 
-You can also create a key under **Keys** without choosing an agent. It reaches nothing until you attach it, which is useful when you want to hand out a credential before deciding what it may do.
+You can also select **New key** on [Agents](https://www.noetive.io/dashboard/agents) without choosing an agent. It reaches nothing until you attach it, which is useful when you want to hand out a credential before deciding what it may do.
 
 ## Attaching and detaching
 
-An agent with no key shows **Or attach a key you already have** under **Give this agent a key**. Pick any live key that is not attached to an agent.
+An agent with no key shows **Or attach a key you already have** beside **Give this agent a key**. Pick any live key that is not attached to an agent.
 
-**Detach** releases a key from its agent without revoking it. Anything using the key stops reaching that agent's namespaces and mailbox until you attach it again. To move a deployed key to a different agent without redeploying the secret, detach it, then attach it from the other agent's card.
+**Detach** releases a key from its agent without revoking it. Anything using the key stops reaching that agent's namespaces and mailbox until you attach it again. To move a deployed key to a different agent without redeploying the secret, detach it on its agent's page, then attach it on the other agent's page.
 
 Changes take effect within about a minute.
 
 ## Rotating a key
 
-Select **Rotate key** on the agent's card and choose how long the current key keeps working: **1 hour**, **24 hours**, **7 days**, or **Stop it now**. The agent immediately gains a new key, which is shown once. The previous key keeps working for the period you chose, then stops, so you can deploy the new value without downtime.
+Select **Rotate key** on the agent's page and choose how long the current key keeps working: **1 hour**, **24 hours**, **7 days**, or **Stop it now**. The agent immediately gains a new key, which is shown once. The previous key keeps working for the period you chose, then stops, so you can deploy the new value without downtime.
 
-The previous key is listed on the agent's card until then, with **Revoke now** if you finish early. Rotating never extends a key: one already due to expire sooner keeps its date.
+The previous key is listed on the agent's page until then, with **Revoke now** if you finish early. Rotating never extends a key: one already due to expire sooner keeps its date.
 
 ## Keys with a new value
 
