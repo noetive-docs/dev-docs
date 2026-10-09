@@ -44,7 +44,7 @@ Every publish, search and subscribe scopes itself with the `namespace` field in 
   "namespace": "acme-prod",
   "model": "Qwen3-Embedding-4B",
   "dimensions": 1024,
-  "query": "MATCH DISTANCE(\"payment failure\") WITHIN 0.5 LIMIT 20"
+  "query": "MATCH DISTANCE(\"payment failure\") LIMIT 20"
 }
 ```
 
@@ -53,7 +53,7 @@ There is no default, so the field is required on every call.
 SemQL also has a `NAMESPACE` clause, which restates that scope so it can be checked:
 
 ```sql
-MATCH DISTANCE("payment failure") WITHIN 0.5
+MATCH DISTANCE("payment failure")
 NAMESPACE "acme-prod"
 LIMIT 20
 ```

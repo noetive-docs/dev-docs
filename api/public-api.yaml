@@ -41,10 +41,51 @@ info:
     | operands per `AND` or `OR` | 16 |
     | parenthesis nesting depth | 128 |
 
-    Value ranges: `WITHIN` in `[0, 1]`, `CONE` in `[0, π]` radians, `LIMIT`
-    and `WINDOW` strictly positive. `WITHIN` and `TOP` are mutually
-    exclusive on one clause. `LIMIT` is the exception to the reject rule —
-    see `SearchRequest.limit`.
+    Value ranges: `CONE` in `[0, π]` radians (1.0 when omitted), `LIMIT`
+    and `WINDOW` strictly positive. `LIMIT` is the exception to the reject
+    rule — see `SearchRequest.limit`.
+
+    ## Relevance: no threshold to tune
+
+    Semantik decides how close is close enough for every clause, so a
+    query states what it is about and never how strict to be. A clause
+    holds for a message only when the message is closer to it than
+    general reference text is. The bar rises with the clause's breadth: a
+    broad anchor, or several anchors of one kind ORed together, is held to
+    a higher bar than a narrow one, because it sits closer to everything.
+
+    - `A AND B` matches a message only when each of `A` and `B` holds on
+      its own; a strong match on one does not make up for the other.
+    - `A OR B OR C` with clauses of one kind holds them to one shared bar,
+      measured on the group as a whole. ORing in another anchor widens
+      what the query is about, but if the new anchor is broader it also
+      raises the shared bar, so marginal matches of the narrower anchors
+      can drop out. Clauses of different kinds in one `OR` (`DISTANCE`,
+      `DIRECTION`, `CONTRAST`) each keep their own bar.
+    - `NOT` is supported only directly under an `AND` that also has a
+      positive clause, as in `A AND NOT B`, which excludes messages
+      closer to `B` than general reference text is. Anywhere else
+      (`A OR NOT B`, an `AND` of only exclusions) it would match nearly
+      every message, and the query is refused with
+      `400 invalid_request`; `/v1/lint` reports it.
+    - `DIRECTION`'s `CONE` can only tighten a clause: a message must be
+      inside the cone and above the bar, so a cone wider than the bar
+      changes nothing.
+    - On search, `TOP k` returns the k nearest messages that also clear
+      the bar, so it can return fewer than k.
+    - Messages published with your own `vector` must come from the
+      namespace's model: the bar is measured in that model's space.
+
+    `WITHIN` is part of the SemQL language but is not accepted here: a
+    query that sets it on any clause is refused on `/v1/search` and
+    `/v1/subscribe` with `400 invalid_request`, and `/v1/lint` reports it.
+    Remove the clause. To match less, make the anchor text more specific;
+    to match more, OR in another anchor of similar specificity. On search,
+    `TOP` and `LIMIT` still bound how many results come back.
+
+    The bar separates a subject from general text. It does not decide
+    which of several subscribers on the same subject should act on a
+    message; for that, see `SubscribeRequest.group`.
 
     ## Namespace scope and the `NAMESPACE` clause
 
@@ -95,10 +136,11 @@ info:
     | `unsupported_media_type` | `Content-Type` is not `application/json` |
     | `request_too_large` | request body exceeds the endpoint size limit |
     | `rate_limited` | per-client burst or rate limit exhausted |
-    | `too_many_requests` | concurrency limit exhausted, or the namespace is at its concurrent-subscription cap |
+    | `too_many_requests` | concurrency limit exhausted, or a subscription cap is reached: per namespace, per caller, or node-wide; `retry_after_ms` is set |
     | `unavailable` | service temporarily unavailable; retry after `retry_after_ms` |
     | `namespace_unavailable` | namespace lookup is transiently unavailable; retry after `retry_after_ms` |
     | `namespace_disabled` | the namespace alias exists but has been administratively disabled |
+    | `namespace_out_of_scope` | the namespace alias exists on your account, but the API key you presented belongs to an agent that may not reach it; use a key whose agent covers it, or widen that agent's scope |
     | `model_not_provisioned` | the namespace alias exists but has no entry for the requested (model, dimensions) combination |
     | `not_billable` | no active subscription on the account; resolve billing before retrying |
     | `metering_unavailable` | metered billing is transiently unavailable; retry with backoff |
@@ -154,10 +196,18 @@ paths:
               textQuery:
                 summary: Text anchor search
                 value:
-                  query: 'MATCH DISTANCE("machine learning research") WITHIN 0.4 LIMIT 10'
+                  query: 'MATCH DISTANCE("machine learning research") LIMIT 10'
                   namespace: global
                   model: Qwen3-Embedding-4B
                   dimensions: 1024
+              withVector:
+                summary: Search and return each result's embedding
+                value:
+                  query: 'MATCH DISTANCE("machine learning research") LIMIT 10'
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+                  include_vector: true
       responses:
         '200':
           description: Ranked search results
@@ -171,9 +221,13 @@ paths:
 
             - `invalid_request` — malformed JSON, SemQL compile error,
               missing required field, malformed namespace, or unknown
-              namespace alias. Also returned when a `NAMESPACE` clause
-              disagrees with the `namespace` field, or names more than one
-              namespace — see "Namespace scope and the `NAMESPACE` clause".
+              namespace alias. Also returned for a query that sets `WITHIN`,
+              places `NOT` anywhere but directly under an `AND` with a
+              positive clause, or has a clause no message could ever clear
+              (see "Relevance: no threshold to tune"), and when a
+              `NAMESPACE` clause disagrees with the `namespace` field, or
+              names more than one namespace — see "Namespace scope and the
+              `NAMESPACE` clause".
             - `model_not_provisioned` — the namespace alias exists but has
               no entry for the requested (model, dimensions) combination.
           content:
@@ -197,9 +251,13 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            Namespace is administratively disabled. `error` is
-            `namespace_disabled`. The alias resolves but has been turned
-            off; retries do not help until the namespace is re-enabled.
+            The namespace cannot be used by this caller. `error` is either
+            `namespace_disabled` — the alias resolves but has been turned off,
+            and retries do not help until it is re-enabled — or
+            `namespace_out_of_scope`, meaning the alias exists on the account but
+            the presented key belongs to an agent that may not reach it. The
+            second is not a transient condition either: use a key whose agent
+            covers the namespace, or widen that agent's scope.
           content:
             application/json:
               schema:
@@ -342,7 +400,7 @@ paths:
         '403':
           description: |
             Namespace is administratively disabled. `error` is
-            `namespace_disabled`. Retries do not help until the namespace
+            `namespace_disabled` or `namespace_out_of_scope`. Retries do not help until the namespace
             is re-enabled.
           content:
             application/json:
@@ -432,8 +490,8 @@ paths:
               simple:
                 summary: Lint a partial query
                 value:
-                  query: 'MATCH DISTANCE("climate change") WITHIN '
-                  cursor: 40
+                  query: 'MATCH DISTANCE("climate change") '
+                  cursor: 33
       responses:
         '200':
           description: Lint diagnostics and completions.
@@ -501,7 +559,15 @@ paths:
         data: {"subscription_id":"sub_8f2c..."}
 
         event: match
-        data: {"message_id":"msg_7a21de40f1b2c493","score":0.82}
+        data: {"message_id":"msg_7a21de40f1b2c493","seq":150,"score":0.82}
+        ```
+
+        With `include_vector: true`, each `match` frame also carries the
+        message's full embedding:
+
+        ```
+        event: match
+        data: {"vector":[0.0132,-0.0481,...],"message_id":"msg_7a21de40f1b2c493","seq":150,"score":0.82}
         ```
 
         Requires `Content-Type: application/json`.
@@ -515,10 +581,26 @@ paths:
               simple:
                 summary: Subscribe to a SemQL query
                 value:
-                  query: 'MATCH DISTANCE("gpu shortage") WITHIN 0.5'
+                  query: 'MATCH DISTANCE("gpu shortage") OR DISTANCE("datacenter accelerator supply is constrained")'
                   namespace: global
                   model: Qwen3-Embedding-4B
                   dimensions: 1024
+              competingRoles:
+                summary: One of several roles that split a stream between them
+                value:
+                  query: 'MATCH DISTANCE("hospital reports a shortage of ICU beds or staff") OR DISTANCE("Coordinates hospital capacity: beds, ICU, ventilators, clinical staffing and facility-level PPE.")'
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+                  group: pandemic-roles
+              withVector:
+                summary: Subscribe and receive each match's embedding
+                value:
+                  query: 'MATCH DISTANCE("gpu shortage")'
+                  namespace: global
+                  model: Qwen3-Embedding-4B
+                  dimensions: 1024
+                  include_vector: true
       responses:
         '200':
           description: |
@@ -542,7 +624,12 @@ paths:
               malformed namespace, or an unknown namespace alias. Also
               returned for a query that constrains nothing (no `DISTANCE`,
               `DIRECTION` or `CONTRAST` clause) and for any use of `TOP`,
-              neither of which a subscription supports. Also returned when a
+              neither of which a subscription supports; for a query that
+              sets `WITHIN`, places `NOT` anywhere but directly under an
+              `AND` with a positive clause, or has a clause no message could
+              ever clear (see "Relevance: no threshold to tune"); for a
+              malformed `group`; and for a `group` whose current members
+              match on different clause kinds. Also returned when a
               `NAMESPACE` clause disagrees with the `namespace` field, or
               names more than one namespace — see "Namespace scope and the
               `NAMESPACE` clause".
@@ -570,7 +657,7 @@ paths:
         '403':
           description: |
             Namespace is administratively disabled. `error` is
-            `namespace_disabled`. Retries do not help until the namespace
+            `namespace_disabled` or `namespace_out_of_scope`. Retries do not help until the namespace
             is re-enabled.
           content:
             application/json:
@@ -705,6 +792,36 @@ components:
             silently miss results. Narrow the `WINDOW` or tighten the query
             instead of raising the limit.
 
+            With `include_vector: true` the ceiling is **50**, applied the
+            same way, and also when no limit is given: a vector search returns
+            at most 50 results.
+
+            A page can also come back shorter than the limit when it would
+            exceed the response size cap — see `SearchResponse.truncated`.
+        include_vector:
+          type: boolean
+          default: false
+          description: |
+            When `true`, every result carries the matched message's full
+            embedding in `ResultItem.vector`. Off by default.
+
+            The vector is the one the message was stored with: for a message
+            published with a `vector`, it is what you sent at 32-bit float
+            precision (components sent with more precision come back rounded);
+            for a message published as `text`, it is the embedding the server
+            computed at publish time. Use it instead of re-embedding the
+            returned `content`, which costs tokens and need not reproduce the
+            stored vector exactly.
+
+            A stored vector is readable by every caller that can reach the
+            namespace, exactly like its `content` and `metadata`. Publish into
+            a namespace only what its readers may see, vectors included.
+
+            Each vector adds roughly `dimensions × 13` bytes of JSON per
+            result — about 13 KB at 1024 dimensions. To keep pages bounded, a
+            search with `include_vector: true` returns **at most 50 results**;
+            a larger `limit` or SemQL `LIMIT` is clamped to 50, not rejected.
+
     SearchResponse:
       type: object
       properties:
@@ -713,6 +830,22 @@ components:
           items:
             $ref: '#/components/schemas/ResultItem'
           description: Ranked list of matched documents.
+        truncated:
+          type: boolean
+          description: |
+            Present and `true` only when the page was cut short to keep the
+            response under 8 MiB. The results returned are the best-ranked
+            ones, in order; lower-ranked matches that did not fit are left
+            out. Absent on a complete page.
+
+            Large `content` is what usually reaches the cap — around 40
+            results of maximum-size, heavily escaped text. If you see it,
+            lower the `limit` or narrow the query and search again; the
+            dropped results cannot be paged to.
+
+            It reports only the size cap. A page clamped to the result ceiling
+            (1000, or 50 with `include_vector`) is not marked truncated, so a
+            page that fills the effective limit may have more matches.
 
     ResultItem:
       type: object
@@ -740,6 +873,15 @@ components:
             as `PublishRequest.metadata`.
           additionalProperties:
             type: string
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+          description: |
+            The matched message's full embedding, with `dimensions` components.
+            Present only when the request set `include_vector: true`; absent
+            otherwise. See `SearchRequest.include_vector`.
 
     PublishRequest:
       type: object
@@ -876,8 +1018,8 @@ components:
 
             Length must equal the request's `dimensions`, which is itself
             capped at 4096 and must match the namespace's configured model
-            dimensionality. `NaN` and `Infinity` components are rejected
-            with `400 invalid_request`.
+            dimensionality. `NaN` and `Infinity` components, and an all-zero
+            vector, are rejected with `400 invalid_request`.
 
     PublishResponse:
       type: object
@@ -1014,8 +1156,16 @@ components:
             Two clause shapes are rejected here that `/v1/search` accepts:
             a query with no `DISTANCE`, `DIRECTION` or `CONTRAST` clause
             (it would deliver the namespace's entire stream), and any use of
-            `TOP` (it ranks within a result set, and a stream has none — use
-            `WITHIN` instead). Both return `400 invalid_request`.
+            `TOP` (it ranks within a result set, and a stream has none).
+            Both return `400 invalid_request`. A subscription receives a
+            message only when each of its clauses holds — see "Relevance:
+            no threshold to tune".
+
+            For a role that should own a share of a stream, write a few
+            short anchors in the words its messages use, and OR in one
+            sentence stating what the role is responsible for. The
+            sentence covers parts of the job the short anchors miss; on its
+            own it matches worse than the anchors do.
         namespace:
           type: string
           x-default: global
@@ -1046,6 +1196,66 @@ components:
             Embedding vector dimensionality. Required; there is no default.
             Must match the dimensionality configured on the namespace for
             `model`, or the request fails with `400 model_not_provisioned`.
+        include_vector:
+          type: boolean
+          default: false
+          description: |
+            When `true`, every `match` frame carries the matched message's
+            full embedding in `MatchEvent.vector`. Off by default, and fixed
+            for the life of the stream.
+
+            The vector is the one the message was stored with: for a message
+            published with a `vector`, it is what was sent at 32-bit float
+            precision (components sent with more precision come back rounded);
+            for a message published as `text`, it is the embedding the server
+            computed at publish time. Like a message's `content` and
+            `metadata` in search results, it is readable by every caller that
+            can reach the namespace.
+
+            Each vector adds roughly `dimensions × 13` bytes of JSON per
+            frame — about 13 KB at 1024 dimensions. On a busy namespace,
+            read the stream promptly.
+        group:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_-]+$'
+          description: |
+            Makes this subscription compete with your other subscriptions
+            in the same namespace that name the same group. A message that
+            matches more than one member goes only to the member it is
+            closest to, and to any member that ties it exactly; the others
+            do not receive it. Omit it for a subscription that receives
+            every message it matches.
+
+            Use a group when several subscriptions split one stream between
+            them, such as agent roles, so that each message has one owner
+            instead of reaching every role it is loosely related to.
+
+            - A group belongs to the account that opened it. Every API key
+              on your account shares your group names, so any of your keys
+              can join a group; subscriptions opened by another account
+              never compete with yours, whatever group name they use.
+            - Only open streams compete. Once Semantik sees that the member
+              that would have won a message has closed its stream, the
+              next-closest open member receives it; until then, messages
+              that member wins are lost with the stream.
+            - A message genuinely relevant to two members reaches only the
+              closer one unless they tie.
+            - A member's `seq` values have gaps for messages another member
+              won, so in a group a gap does not by itself mean a lost
+              message. Messages are still dropped when the winning member's
+              stream is not being read fast enough, as for any
+              subscription; they are not passed to the next member.
+            - Members are compared by `score`, so they must match on the
+              same clause kinds (`DISTANCE`, `DIRECTION`, `CONTRAST`,
+              ignoring clauses under `NOT`): a `CONTRAST` member scores
+              lower than a `DISTANCE` member for an equally good match. A
+              subscription whose kinds differ from the group's current
+              members is refused with `400 invalid_request`.
+            - Write members in the same shape too. An `AND` member scores the
+              mean of its clauses and an `OR` member the best of them, so
+              an `AND` member loses to an `OR` member it would otherwise tie.
 
     SubscribedEvent:
       type: object
@@ -1075,6 +1285,16 @@ components:
           type: number
           format: float
           description: Composite relevance score.
+        lead:
+          type: number
+          format: float
+          description: |
+            Present only for a subscription in a `group`, when another
+            member of the group also matched the message: this
+            subscription's `score` minus the best `score` among those other
+            members. Zero means a tie. A small lead says the message sat
+            between two members; a consistently small lead between the same
+            two says their queries overlap.
         seq:
           type: integer
           format: uint64
@@ -1084,6 +1304,16 @@ components:
             namespace-wide ordering. Matches are delivered concurrently and
             are not ordered by it; it is here so a subscriber can recognise
             a message it has already seen, not so it can sequence a stream.
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+          description: |
+            The matched message's full embedding, with `dimensions` components.
+            Present only when the subscription was opened with
+            `include_vector: true`; absent otherwise. See
+            `SubscribeRequest.include_vector`.
 
     ErrorResponse:
       type: object

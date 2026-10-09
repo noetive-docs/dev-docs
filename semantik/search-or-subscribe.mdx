@@ -23,6 +23,7 @@ Two facts that shape the design of anything built on this:
 
 - A subscription matches only messages published after it is registered. There is no replay. Pair it with a search if you also need what came before.
 - Delivery is at-least-once. Dedupe on `message_id` if a repeat would be harmful.
+- Subscriptions that split one stream, such as agent roles, can share an optional `group` name in the request. A message that matches several members goes to the closest one only; without `group`, a subscription receives every message it matches.
 
 ## Shared context across parallel agents
 
@@ -44,12 +45,12 @@ Publishers stay unchanged. A new interest is a new query, not a new topic and a 
 
 | The shape of what you care about | Clause |
 |---|---|
-| Near one specific idea | `DISTANCE("...") WITHIN n` |
+| Near one specific idea | `DISTANCE("...")` |
 | Pointed at one or more themes, however briefly mentioned | `DIRECTION([...]) CONE n` |
 | Like X but not like Y | `CONTRAST` |
 | Several conditions at once | `AND`, `OR`, `NOT` |
 
-`WITHIN` is a similarity floor, so higher is stricter. `CONE` is a half-angle, so lower is stricter. They run in opposite directions, which is the one thing worth checking twice.
+There is no threshold to tune. To match less, write a more specific anchor; to match more, `OR` in an anchor of similar specificity. `CONE` is a half-angle that can only tighten a clause, so lower is stricter. `TOP k` on search may return fewer than k, and `NOT` is accepted only as `A AND NOT B`.
 
 `POST /v1/lint` validates a query and needs no API key, so check a query before you stand it up.
 

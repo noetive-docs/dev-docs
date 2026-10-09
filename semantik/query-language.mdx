@@ -27,11 +27,11 @@ MATCH <expression>
 
 ### DISTANCE
 
-Nearest-neighbor sphere in embedding space. Matches messages whose embedding is at least as similar to the anchor as the `within` floor you set.
+Nearest-neighbor sphere in embedding space. Matches messages whose embedding is closer to the anchor than general reference text is.
 
 <CodeGroup>
 ```sql SemQL
-MATCH DISTANCE("payment reconciliation failure") WITHIN 0.8
+MATCH DISTANCE("payment reconciliation failure")
 NAMESPACE "org:acme-corp"
 LIMIT 20
 ```
@@ -39,7 +39,7 @@ LIMIT 20
 ```json JSON
 {
   "match": {
-    "distance": { "anchor": "payment reconciliation failure", "within": 0.8 }
+    "distance": { "anchor": "payment reconciliation failure" }
   },
   "namespace": { "include": ["org:acme-corp"] },
   "limit": 20
@@ -50,15 +50,10 @@ LIMIT 20
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `anchor` | string \| float[] | yes | — | Center point — natural language text or raw embedding vector |
-| `within` | number | no | — | Minimum cosine similarity (0.0–1.0); 0 means no floor |
-| `top_k` | integer | no | — | Return top-k nearest neighbors, 1–1000. Search only; `/v1/subscribe` rejects it |
+| `top_k` | integer | no | — | Return up to k nearest neighbors, 1–1000. May return fewer when fewer messages are relevant. Search only; `/v1/subscribe` rejects it |
 | `metric` | string | no | `"cosine"` | Distance metric: `"cosine"`, `"euclidean"`, or `"dot"`. JSON only; the text syntax has no equivalent keyword |
 
-<Note>
-`within` is a **similarity floor, not a distance ceiling**. A message matches when its similarity to the anchor is at least `within`, so a **higher value is stricter**. `WITHIN 0.9` is near-exact; `WITHIN 0.3` lets almost everything through. Values above 1.0 are rejected.
-</Note>
-
-Provide either `within` or `top_k`. If neither is set, the clause acts as a scoring signal without a hard threshold.
+Semantik sets the relevance bar for the clause itself, so there is no threshold to tune. See [Relevance](#relevance-no-threshold-to-tune).
 
 ---
 
@@ -92,6 +87,8 @@ NAMESPACE "org:acme-corp"
 
 When `toward` is an array, the direction vector is the normalized mean of all embedded concepts.
 
+`cone` can only tighten the clause: a message must be inside the cone and above the relevance bar, so a cone wider than the bar changes nothing.
+
 ---
 
 ### CONTRAST
@@ -104,7 +101,6 @@ MATCH CONTRAST(
   ATTRACT ["enterprise", "high-value account"],
   REPEL   ["self-serve", "free tier"]
 )
-WITHIN 0.7
 NAMESPACE "org:acme-corp"
 ```
 
@@ -113,8 +109,7 @@ NAMESPACE "org:acme-corp"
   "match": {
     "contrast": {
       "attract": ["enterprise", "high-value account"],
-      "repel": ["self-serve", "free tier"],
-      "within": 0.7
+      "repel": ["self-serve", "free tier"]
     }
   },
   "namespace": { "include": ["org:acme-corp"] }
@@ -126,9 +121,20 @@ NAMESPACE "org:acme-corp"
 |-------|------|----------|---------|-------------|
 | `attract` | string[] | yes | — | Concepts to attract toward |
 | `repel` | string[] | no | — | Concepts to repel from |
-| `within` | number | no | — | Minimum cosine similarity to the composite vector (0.0–1.0); 0 means no floor |
 
 The composite vector is `normalize(mean(embed(attract)) − mean(embed(repel)))`. With `repel` absent it is `normalize(mean(embed(attract)))`.
+
+---
+
+## Relevance: no threshold to tune
+
+Semantik decides how close is close enough for every clause: a clause holds for a message when the message is closer to it than general reference text is. A query says what it is about, never how strict to be.
+
+- To match less, write a more specific anchor.
+- To match more, `OR` in another anchor of similar specificity.
+- On search, `TOP` returns the nearest messages that also hold, so it can return fewer than k. `LIMIT` caps the count.
+
+`WITHIN` exists in SemQL, but Semantik refuses it: a query that sets it, in text or as `"within"` in JSON, is rejected on `/v1/search` and `/v1/subscribe` with `400 invalid_request`, and `/v1/lint` reports it. Remove the clause.
 
 ---
 
@@ -138,14 +144,14 @@ Combine clauses with `AND`, `OR`, and `NOT`. Use parentheses to control preceden
 
 ```sql
 MATCH DIRECTION("payment gateway") CONE 0.3
-  AND DISTANCE("timeout error") WITHIN 0.8
+  AND DISTANCE("timeout error")
 NAMESPACE "org:acme-corp"
 ```
 
 ```sql
 MATCH (
     DIRECTION("infrastructure") CONE 0.3
-  AND DISTANCE("connection failure") WITHIN 0.8
+  AND DISTANCE("connection failure")
 )
 OR (
     DIRECTION("database") CONE 0.3
@@ -159,10 +165,12 @@ NAMESPACE "org:acme-corp"
 
 ```sql
 MATCH DIRECTION("infrastructure security") CONE 0.3
-  AND NOT DISTANCE("routine monitoring") WITHIN 0.75
+  AND NOT DISTANCE("routine monitoring")
 ```
 
-`NOT` narrows a result set but cannot say where to look, so a query whose top level is a bare `NOT` is rejected. Pair it with a positive clause, as above.
+`NOT` narrows a result set but cannot say where to look, so it is accepted only directly under an `AND` that also has a positive clause, as in `A AND NOT B`. Anywhere else (`A OR NOT B`, a bare `NOT`, an `AND` of only exclusions) the query is refused with `400 invalid_request`.
+
+`A AND B` matches a message only when each clause holds on its own. Same-kind clauses joined by `OR` share one relevance bar.
 
 ---
 
@@ -170,7 +178,7 @@ MATCH DIRECTION("infrastructure security") CONE 0.3
 
 `/v1/subscribe` accepts a narrower query set than `/v1/search`: **any use of `TOP` returns `400 invalid_request`**.
 
-`TOP` ranks a message against the others in a result set. A stream has no result set, since each message is scored on its own as it is published, so the clause has no meaning there and is refused rather than quietly ignored. Use `WITHIN` to set a score floor instead.
+`TOP` ranks a message against the others in a result set. A stream has no result set, since each message is scored on its own as it is published, so the clause has no meaning there and is refused rather than quietly ignored. Semantik sets each clause's relevance bar itself, so a subscription needs no score floor.
 
 The query is legal SemQL, so `/v1/lint` reports it as valid. This restriction belongs to the subscribe endpoint, not to the language.
 
@@ -341,7 +349,7 @@ WINDOW 30d
 
 ```
 MATCH AND OR NOT DISTANCE DIRECTION CONTRAST ATTRACT REPEL
-WITHIN TOP CONE WINDOW NAMESPACE ALL GLOBAL LIMIT
+TOP CONE WINDOW NAMESPACE ALL GLOBAL LIMIT
 ```
 
 Reserved words are case-insensitive in text syntax. JSON uses lowercase keys exclusively.
@@ -369,7 +377,7 @@ clause           = distance_clause
                  | contrast_clause ;
 
 distance_clause  = "DISTANCE" "(" anchor ")" [ distance_opts ] ;
-distance_opts    = "WITHIN" number | "TOP" integer ;
+distance_opts    = "TOP" integer ;
 
 direction_clause = "DIRECTION" "(" anchor_list ")" [ direction_opts ] ;
 direction_opts   = "CONE" number ;
@@ -377,7 +385,7 @@ direction_opts   = "CONE" number ;
 contrast_clause  = "CONTRAST" "("
                      "ATTRACT" anchor_list ","
                      "REPEL"   anchor_list
-                   ")" [ "WITHIN" number ] ;
+                   ")" ;
 
 (* The plural forms below parse but are rejected by /v1/search and
    /v1/subscribe — see the NAMESPACE modifier above. *)

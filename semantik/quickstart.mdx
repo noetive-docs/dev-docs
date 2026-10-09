@@ -40,12 +40,12 @@ This page uses four HTTP calls and nothing else. To connect an editor instead, s
     The same SemQL you will subscribe with also works as a one-shot search:
 
     ```bash
-    curl -sS https://semantik.noetive.io/v1/search -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5 LIMIT 5"}'
+    curl -sS https://semantik.noetive.io/v1/search -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") LIMIT 5"}'
     ```
 
     Results come back ranked, each with the message body, its score and its `message_id`. The `namespace` field in the request body is what scopes the call.
 
-    Note that the query matched a message that shares none of its wording. `WITHIN` is a similarity floor, so a higher number is stricter. See [SemQL](/semantik/query-language) for the full clause set.
+    Note that the query matched a message that shares none of its wording. Semantik decides how close counts as a match, so there is no threshold to set. See [SemQL](/semantik/query-language) for the full clause set.
 
     <Info>
       A publish is acknowledged once the write is durable, and the message becomes searchable shortly after. If `results` comes back empty on your first try, run the search again in a moment.
@@ -56,7 +56,7 @@ This page uses four HTTP calls and nothing else. To connect an editor instead, s
     In a second terminal, open a stream with the identical query:
 
     ```bash
-    curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\") WITHIN 0.5"}'
+    curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"query":"MATCH DISTANCE(\"payment gateway timing out during checkout\")"}'
     ```
 
     The first frame confirms the subscription is live:
