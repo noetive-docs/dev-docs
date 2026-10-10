@@ -1,0 +1,76 @@
+---
+title: "Split a stream between roles with message groups"
+sidebarTitle: "Message groups"
+description: "Give each message one owner when several subscriptions cover the same subject, such as the roles of a multi-agent system."
+---
+
+By default every subscription receives every message it matches. That is right for independent consumers and wrong for roles that split one stream between them: a message about ICU beds also sits close to the logistics role and the public-health role, and all three act on it.
+
+A message group fixes that. Subscriptions that name the same `group` compete for each message, and a message that matches several members goes only to the member it is closest to.
+
+A group decides who receives a message, not when. It is not an ordering key like an SQS FIFO message group: nothing is ordered or serialized.
+
+## Subscribe two roles in one group
+
+Open one stream per role, each with its own query and the same `group`:
+
+```bash
+curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"group":"pandemic-roles","query":"MATCH DISTANCE(\"hospital reports a shortage of ICU beds or staff\") OR DISTANCE(\"Coordinates hospital capacity: beds, ICU, ventilators, clinical staffing and facility-level PPE.\")"}'
+```
+
+```bash
+curl -sS -N https://semantik.noetive.io/v1/subscribe -H "Authorization: Bearer $NOETIVE_KEY_SECRET" -H "Content-Type: application/json" -d '{"namespace":"global","model":"Qwen3-Embedding-4B","dimensions":1024,"group":"pandemic-roles","query":"MATCH DISTANCE(\"shipment of masks and test kits is delayed at the warehouse\") OR DISTANCE(\"Runs the supply chain: procurement, warehousing and delivery of masks, test kits, vaccines and medical equipment.\")"}'
+```
+
+Publish a message about a hospital running out of ventilators. It reaches the first stream only, even if it also clears the second role's bar:
+
+```text
+event: match
+data: {"message_id":"msg_01je9c40f1b2c4937a2","seq":150,"score":0.71,"lead":0.09}
+```
+
+`lead` is this member's `score` minus the best `score` among the other members that also matched. It appears only on grouped frames, and only when another member also matched; a member that won uncontested gets a frame without it. `0` means a tie, and every tied member receives the message.
+
+Read `lead` as a confidence signal. A small lead says the message sat between two roles. A consistently small lead between the same two roles says their queries overlap, and one of them needs more specific anchors.
+
+## The group field
+
+`group` is optional on `POST /v1/subscribe`: 1 to 64 characters of letters, digits, `-` and `_`. Omit it and the subscription receives every message it matches, exactly as before.
+
+| Rule | What happens otherwise |
+|---|---|
+| Members match on the same clause kinds (`DISTANCE`, `DIRECTION`, `CONTRAST`), ignoring clauses under `NOT` | The subscription is refused with `400 invalid_request` |
+| `DISTANCE` members use the same metric | The subscription is refused with `400 invalid_request` |
+| Members have the same shape, all `OR` or all `AND` | Accepted, but an `AND` member scores the mean of its clauses and an `OR` member the best, so the `AND` member loses ties it should not |
+
+Members are compared by score, which is why the kinds must agree: a `CONTRAST` member scores lower than a `DISTANCE` member for an equally good match.
+
+## Who competes
+
+- **One account, one namespace.** A group is the set of your account's open subscriptions in one namespace that share a name. Every API key on your account shares your group names, so any of your keys can join your group. Another account's group with the same name never competes with yours.
+- **Only open streams.** Once Semantik sees that a member's stream has closed, the next-closest open member receives what it would have won. Until then, messages that member wins are lost with the stream, so close streams you are done with rather than abandoning them.
+- **No runner-up delivery.** A message genuinely relevant to two members reaches only the closer one unless they tie exactly.
+
+## What changes for the subscriber
+
+A member's `seq` values have gaps for messages another member won. In a group, a gap does not by itself mean a lost message.
+
+Messages are still dropped when the winning member's stream is not read fast enough, as for any subscription. A dropped message is not passed to the next member, so read every member's stream promptly.
+
+Everything else in [Delivery and idempotency](/semantik/delivery) applies unchanged: delivery is at-least-once, and frames carry identifiers, not bodies.
+
+## Write role queries that compete well
+
+For each role, write a few short anchors in the words its messages use, plus one `OR`'d sentence stating what the role is responsible for and naming the concrete things it handles. The two queries above follow that pattern. Short anchors alone, or the sentence alone, each rank the right owner first less often than the two together.
+
+Keep every member in the same shape: the same clause kinds, the same metric, all `OR` or all `AND`.
+
+<Warning>
+  An on-topic message that is nobody's job still reaches the closest role. Groups decide which member owns a message, not whether anyone should. Make every consumer able to decline a message it does not own.
+</Warning>
+
+## When not to use a group
+
+- Consumers that each need their own copy, such as an audit log next to a worker. Leave them ungrouped.
+- Load-balancing identical workers. Members with the same query tie on every message and all receive it.
+- Ordering. Matches are delivered concurrently and are not ordered, in a group or out of one.

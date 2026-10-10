@@ -75,7 +75,7 @@ event: match
 data: {"message_id":"msg_01je9c40f1b2c4937a2","seq":150,"score":0.61}
 ```
 
-Rely on `message_id` and `score`. Treat anything else in the frame as opaque.
+Rely on `message_id` and `score`. A subscription in a [message group](/semantik/message-groups) also gets `lead`, its margin over the other members that matched. Treat anything else in the frame as opaque.
 
 The stream also carries keepalive comment frames — lines beginning with `:` — so an idle subscription is distinguishable from a dead one. Ignore them and never surface them as matches. Use a real SSE parser rather than splitting on newlines; comment-only lines and multi-line `data:` fields are where hand-rolled parsers break.
 

@@ -629,7 +629,8 @@ paths:
               `AND` with a positive clause, or has a clause no message could
               ever clear (see "Relevance: no threshold to tune"); for a
               malformed `group`; and for a `group` whose current members
-              match on different clause kinds. Also returned when a
+              match on different clause kinds or, for `DISTANCE`, a different
+              metric. Also returned when a
               `NAMESPACE` clause disagrees with the `namespace` field, or
               names more than one namespace — see "Namespace scope and the
               `NAMESPACE` clause".
@@ -1252,7 +1253,10 @@ components:
               ignoring clauses under `NOT`): a `CONTRAST` member scores
               lower than a `DISTANCE` member for an equally good match. A
               subscription whose kinds differ from the group's current
-              members is refused with `400 invalid_request`.
+              members is refused with `400 invalid_request`. `DISTANCE`
+              members must also use the same metric, since each metric
+              scores on its own scale; mixing metrics is refused the same
+              way.
             - Write members in the same shape too. An `AND` member scores the
               mean of its clauses and an `OR` member the best of them, so
               an `AND` member loses to an `OR` member it would otherwise tie.

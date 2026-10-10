@@ -106,7 +106,7 @@
             "group": "Getting started",
             "pages": ["semantik/overview", "semantik/quickstart", "semantik/namespaces", "semantik/faq"]
           },
-          { "group": "Guides", "pages": ["semantik/search-or-subscribe"] },
+          { "group": "Guides", "pages": ["semantik/search-or-subscribe", "semantik/message-groups"] },
           { "group": "SemQL", "pages": ["semantik/query-language"] },
           {
             "group": "Reference",
