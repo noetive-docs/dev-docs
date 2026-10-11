@@ -3,7 +3,7 @@ title: "Architecture"
 description: "Two services, Semantik and Bud, behind one account, one key, and one bill."
 ---
 
-Noetive runs two services behind one account, one key, and one bill: **Semantik**, a semantic message broker, and **Bud**, mail, calendar, and contacts for agents. This page covers how each fits together.
+Noetive runs two services behind one account, one key, and one bill: **Semantik**, a semantic message broker, and **Bud**, email for AI agents. This page covers how each fits together.
 
 ## Semantik message flow
 
@@ -41,7 +41,7 @@ sequenceDiagram
 
 ## Bud
 
-**Bud** gives an agent its own mailbox, calendar, and address book, reachable at `bud.noetive.io`. Every endpoint is a JSON `POST`, and `watch` streams mail events. See the [Bud overview](/bud/overview).
+**Bud** gives an agent its own address and mailbox, reachable at `bud.noetive.io`. Every endpoint is a JSON `POST`, and `watch` streams mail events. See the [Bud overview](/bud/overview).
 
 ## Further reading
 
@@ -49,4 +49,4 @@ sequenceDiagram
 - [API keys](/platform/api-keys): developer credentials for programmatic access
 - [SemQL query language](/semantik/query-language): full language specification
 - [MCP server](/references/ai-tools/mcp): MCP tool reference
-- [Bud overview](/bud/overview): mail, calendar, and contacts for agents
+- [Bud overview](/bud/overview): email for agents

@@ -1,18 +1,13 @@
 ---
 title: "Bud"
-description: "Mail, calendar and contacts for agents, at bud.noetive.io."
-keywords: ["agent email", "agent calendar", "agent inbox"]
+description: "Email for AI agents, at bud.noetive.io."
+keywords: ["agent email", "agent inbox", "email for AI agents"]
 ---
 
-Bud is mail, calendar and contacts for agents, at `https://bud.noetive.io`. Each agent gets its own email address, its own calendar and its own address book, reachable through one small API rather than three separate ones.
+Bud is email for AI agents, at `https://bud.noetive.io`. Each agent gets its own address and mailbox behind one small API, with sending limits it can read but can't raise. A calendar is coming next, on the same API.
 
 <Warning>
-  Bud is in preview. Contacts, drafts, calendar events without attendees, and reading all work.
-
-  - Mail is not delivered in either direction: a send is accepted but not delivered, and mail from outside cannot reach an agent's address.
-  - An event with attendees is refused, so no invitations are sent.
-  - The `watch` stream reports mail events only.
-  - A send is billed when Bud accepts it, whether or not it is delivered.
+  Bud is in preview. Mail is delivered in both directions. Custom mail domains aren't available yet, and the calendar is coming next.
 </Warning>
 
 ## Before you start

@@ -1,6 +1,6 @@
 ---
 title: "Agents and addresses"
-description: "How an agent gets a mailbox, calendar and address book, and what its address looks like."
+description: "How an agent gets a mailbox, and what its address looks like."
 ---
 
 Setting up Bud takes an active subscription, an agent to hold the mailbox, and a developer key for that agent. Without an active subscription, calls to Bud fail with 402 and nothing is set up.
@@ -17,7 +17,7 @@ Setting up Bud takes an active subscription, an agent to hold the mailbox, and a
   </Step>
 </Steps>
 
-There is no separate provisioning call. The first authenticated request a key makes to Bud sets up the account's mail domain and that agent's mailbox, calendar and address book together, if they do not already exist.
+There is no separate provisioning call. The first authenticated request a key makes to Bud sets up the account's mail domain and that agent's mailbox together, if they do not already exist.
 
 ## What an address looks like
 
@@ -33,7 +33,7 @@ That subdomain belongs to your account permanently. It is never reassigned to an
 
 ## What a key reaches
 
-A developer key reaches its own agent's mailbox, calendar and address book, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses account boundaries: an agent in your account cannot be granted access to an agent in someone else's.
+A developer key reaches its own agent's mailbox, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses account boundaries: an agent in your account cannot be granted access to an agent in someone else's.
 
 Scopes are chosen per agent under **Mail and calendar** on its Edit access page, reached from the agent's page at [Agents](https://www.noetive.io/dashboard/agents), from `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. A key carries the scopes of the agent it is attached to.
 

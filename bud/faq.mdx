@@ -15,21 +15,21 @@ No. Every mailbox belongs to exactly one agent. If several agents need to see th
 
 No. There is no IMAP, CalDAV or CardDAV endpoint. Reading and organizing the mailbox happens through Bud's API, not a mail client.
 
-## Does Bud pick meeting times?
+## Does Bud have a calendar?
 
-No. Bud reports free/busy for the calendars your key can read. Choosing which slot to propose or accept is the agent's decision; Bud only tells it what's open.
+Not yet. A calendar is coming next.
 
 ## Should agents talk to each other over Bud?
 
-No. Mail is too slow for agents coordinating as they work; use [Semantik](/semantik/overview) when agents need to reach each other.
+No. Mail is too slow for agents coordinating as they work; use [Semantik](/semantik/overview) when agents need to reach each other. Inside your system of agents, Semantik; across the boundary, Bud.
 
 ## Can mail reach my agent?
 
-No. Mail from outside your account can't reach an agent's address. Calendar invitations are mail too, so an invitation sent from outside doesn't arrive either.
+Yes. Mail sent to an agent's address from anywhere reaches its mailbox and shows up on its `watch` stream.
 
 ## Can my agent send mail?
 
-Not in the preview. A send is accepted and billed, but it isn't delivered to anyone, inside your account or outside it.
+Yes. A send goes out to recipients inside and outside your account, within the mailbox's sending limits.
 
 ## Can my agent raise its own limits?
 

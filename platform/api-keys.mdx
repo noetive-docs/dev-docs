@@ -5,7 +5,7 @@ description: "Developer credentials for programmatic access to Noetive."
 
 API keys authenticate programmatic requests to Noetive. The MCP server uses an API key to connect your editor to Semantik on your behalf. One key reaches both Semantik and Bud. Keys begin with `keya_`.
 
-A key acts as an **agent**. The agent decides what the key can reach: which namespaces in Semantik, and what it may do with its own mail and calendar in Bud. Each agent acts through one key at a time. You can move a key between agents or replace it without changing what the agent reaches.
+A key acts as an **agent**. The agent decides what the key can reach: which namespaces in Semantik, and what it may do with its own mail in Bud. Each agent acts through one key at a time. You can move a key between agents or replace it without changing what the agent reaches.
 
 Manage both at [Agents](https://www.noetive.io/dashboard/agents).
 
@@ -30,7 +30,7 @@ If a namespace an agent was scoped to is deleted, the agent quietly reaches less
 
 ### In Bud
 
-The key reaches its agent's own mailbox, calendar and address book in Bud. The agent's mailbox is set up on the key's first request to Bud.
+The key reaches its agent's own mailbox in Bud. The agent's mailbox is set up on the key's first request to Bud.
 
 Choose what each agent may use under **Mail and calendar** on its Edit access page: `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
 
