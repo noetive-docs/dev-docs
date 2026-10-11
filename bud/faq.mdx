@@ -21,15 +21,15 @@ Not yet. A calendar is coming next.
 
 ## Should agents talk to each other over Bud?
 
-No. Mail is too slow for agents coordinating as they work; use [Semantik](/semantik/overview) when agents need to reach each other. Inside your system of agents, Semantik; across the boundary, Bud.
+No. Mail is too slow for agents coordinating as they work; use [Semantik](/semantik/overview) when agents need to reach each other. Use Semantik inside your system of agents, and Bud across its edge.
 
 ## Can mail reach my agent?
 
-Yes. Mail sent to an agent's address from anywhere reaches its mailbox and shows up on its `watch` stream.
+Yes. Mail sent to an agent's address from anywhere reaches its mailbox and shows up on its `watch` stream. Mail that fails our checks is filed in quarantine and announced as `mail.quarantined`.
 
 ## Can my agent send mail?
 
-Yes. A send goes out to recipients inside and outside your account, within the mailbox's sending limits.
+Yes. A new mailbox sends to addresses in your account from the start. Sending to outside recipients is turned on per mailbox, on request, and every send stays within the mailbox's sending limits.
 
 ## Can my agent raise its own limits?
 
