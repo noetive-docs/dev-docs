@@ -78,7 +78,7 @@ The server reads its key from `NOETIVE_KEY_SECRET`. Create one on an agent at [A
 export NOETIVE_KEY_SECRET=keya_...
 ```
 
-`init` writes a reference to that variable rather than the key itself, so the secret stays out of a config file that gets synced or committed. Kiro and Codex are the exceptions: neither expands variables, so `--api-key` writes the literal value and tightens the file mode. Hermes does expand it, and resolves it from `~/.hermes/.env` before the environment it was launched in.
+`init` writes a reference to that variable rather than the key itself, so the secret stays out of a config file that gets synced or committed. Kiro and Codex are the exceptions: neither expands variables, so pass `--api-key`, which stores the literal value in the editor's config (as it does for any editor you pass it to). Hermes does expand it, and resolves it from `~/.hermes/.env` before the environment it was launched in. [Configuration and secrets](/platform/configuration) lists every variable, the files `init` writes, and the hosts the server contacts.
 
 ## Choose a namespace up front
 

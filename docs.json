@@ -95,7 +95,7 @@
             "pages": ["guides/quickstart", "guides/mcp-setup"]
           },
           { "group": "Overview", "pages": ["platform/architecture"] },
-          { "group": "Account", "pages": ["platform/api-keys"] },
+          { "group": "Account", "pages": ["platform/api-keys", "platform/configuration"] },
           { "group": "Billing", "pages": ["platform/billing", "platform/usage"] }
         ]
       },
