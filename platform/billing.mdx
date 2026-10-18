@@ -4,7 +4,7 @@ description: "Subscription and metered usage billing for Noetive."
 ---
 
 <Info>
-  Every charge is metered and billed **weekly**. Check [Settings → Usage](https://www.noetive.io/settings/usage) to track spend before each weekly invoice.
+  You're billed **weekly**: a flat fee per namespace, plus metered usage. Check [Settings → Usage](https://www.noetive.io/settings/usage) to track Semantik usage before each weekly invoice.
 </Info>
 
 ## Semantik
@@ -35,23 +35,24 @@ For example, one agent making 300,000 requests and sending 3,000 messages in a m
   Every authenticated request counts, including ones refused as invalid and calls to `health` and `catalog.describe`. Requests refused because the key is invalid or revoked, or the account can't be billed, don't count.
 </Note>
 
-Prices exclude VAT. New accounts get $30 in signup credits, used up before any card is charged. The rates are also on [noetive.io/bud/pricing](https://www.noetive.io/bud/pricing), which has a cost calculator.
+Prices exclude VAT. When you add a card for the first time, Noetive emails you a one-time €30 credit code. Redeem it under [Settings → Billing](https://www.noetive.io/settings/billing) within 90 days; it needs an active subscription and applies to a single invoice. The rates are also on [noetive.io/bud/pricing](https://www.noetive.io/bud/pricing), which has a cost calculator.
 
 ## Subscription status
 
-This section covers Semantik namespaces.
+Status applies to every Noetive service. Requests are accepted while the subscription is active and a card is on file, or while a promotional grant from Noetive is active; otherwise they are refused with `402 not_billable`.
 
 | Status | What it means |
 |--------|---------------|
 | Active | Billing is current; all features available |
-| Pending | A payment is being processed |
-| Cancelled | Subscription ended; namespace creation disabled |
+| Past due | A payment failed and is being retried; requests are refused until it succeeds |
+| Cancelled | Subscription ended; requests are refused |
+| Any other status | Requests are refused |
 
-If a payment fails, Noetive sends a reminder email three days after the missed payment. On cancellation, existing namespaces remain readable until the end of the billing period.
+If a payment fails, Noetive emails you straight away. If you cancel, everything keeps working until the end of the current period, shown as **Expires** under [Settings → Billing](https://www.noetive.io/settings/billing).
 
 ## Viewing invoices
 
-Go to [Settings → Billing](https://www.noetive.io/settings/billing) to see your invoice history. Each row shows the invoice date, amount, status (paid, open, or void), and a PDF download link.
+Go to [Settings → Billing](https://www.noetive.io/settings/billing) to see your invoices and credit notes. Each row shows the date, amount and status — for example Paid, Paid with credit, Due or Unpaid — with links to the PDF and, once paid, the receipt.
 
 ## Managing payment
 
