@@ -13,7 +13,7 @@ description: "Subscription and metered usage billing for Noetive."
 |--------|------|----------------|
 | Namespace | per namespace | Each active namespace, charged for the week |
 | Requests | per request | Each publish, search, and subscribe call to Semantik |
-| Storage | GB-hours | Message data retained, measured as gigabytes × hours stored |
+| Storage | GB-hours | Message data retained, measured as gigabytes (10⁹ bytes) × hours stored. Each weekly invoice rounds the total down to a whole GB-hour |
 | Embedding tokens | per token | Tokens embedded when you publish a message, run a search, or open a subscription |
 
 Embedding charges appear on your invoice as your namespace embeds messages.
