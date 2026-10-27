@@ -40,4 +40,6 @@ See [Errors](/platform/errors). Refused requests are not billed.
 
 ## Custom rules
 
-Custom policy rules are coming. Today you set the limits above.
+Beyond the limits above, you can write rules in [Cedar](https://www.cedarpolicy.com) on the agent, tenant and organization policy pages. A rule allows an action, forbids it, or marks it as needing a person's [approval](/platform/approvals). An organization rule can only narrow what is allowed, and a tenant rule can only narrow or define roles, so a lower level never overturns a forbid above it. A rule that cannot be evaluated counts as a forbid.
+
+Rules apply to Bud mail today. A Bud send under rules it cannot check is refused with `policy_unavailable` rather than sent unchecked.

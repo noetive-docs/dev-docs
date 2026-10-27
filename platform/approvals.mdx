@@ -5,9 +5,7 @@ description: "How a person approves an action an agent has asked to take."
 
 An approval puts a person between an agent and an action. The agent asks, the action waits, and someone with the **approver** role decides in the dashboard.
 
-<Note>
-  No Noetive service holds actions for approval at launch, so there is nothing to approve yet. The approver role and the dashboard inbox are in place so you can set them up before the first held action arrives. Custom policy rules, which decide what is held, are coming.
-</Note>
+Bud holds a send for approval when one of your policy rules says it needs a person: for example, mail to a domain outside a list you keep. Sends that no such rule covers go straight out.
 
 ## Who approves
 
@@ -27,4 +25,6 @@ A request nobody decides expires, after 24 hours by default. An expired or rejec
 
 ## What the agent sees
 
-A call that needs approval is refused with `approval_required`. See [Errors](/platform/errors).
+A held send answers with `state: held` and an `approval_id`. The message goes out once an approver approves it, and never otherwise. Nothing the agent sends can release it, so it should not send the message again. A held message has used its sending budget; the budget is given back if the message is rejected or the request expires.
+
+Where an action can't be held, it is refused with `approval_required`. See [Errors](/platform/errors).

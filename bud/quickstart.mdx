@@ -1,7 +1,7 @@
 ---
 title: "Bud quickstart"
 sidebarTitle: "Quickstart"
-description: "Find your agent's address, draft a message and stream what happens."
+description: "Find your agent's address, send a message and stream what happens."
 ---
 
 This assumes [Getting started](/guides/quickstart): an account, an agent and `NOETIVE_KEY_SECRET` set. Bud is at `https://bud.noetive.io`; every operation is a JSON `POST`.
@@ -26,12 +26,12 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
     The response also carries the agent's address and its sending limits.
   </Step>
 
-  <Step title="Draft a message">
+  <Step title="Send a message">
     ```bash
-    curl -sS https://bud.noetive.io/v1/draft.create \
+    curl -sS https://bud.noetive.io/v1/send \
       -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
       -H "Content-Type: application/json" \
-      -d '{"body":{"to":["anna@example.net"],"subject":"Quarterly review","text":"Does next week work?"}}'
+      -d '{"to":["anna@example.net"],"subject":"Quarterly review","text":"Does next week work?","idempotency_key":"quickstart-1"}'
 
     curl -sS https://bud.noetive.io/v1/folder.list \
       -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
@@ -39,7 +39,7 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
       -d "{\"in\":\"$MAILBOX\",\"folder\":\"inbox\"}"
     ```
 
-    The draft sits in the mailbox. There is no send step here.
+    The reply says whether the message is `queued`, or `held` until a person in your team approves it. Pass a new `idempotency_key` for each message: retrying with the same key never sends twice.
   </Step>
 
   <Step title="Stream what happens">
@@ -59,7 +59,7 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
 | Operation | Did |
 |---|---|
 | `me.describe` | Found the agent's address, mailbox and sending limits |
-| `draft.create` | Drafted a message |
+| `send` | Sent a message, or had it held for approval |
 | `folder.list` | Listed messages in a folder |
 | `watch` | Streamed mail events for the mailbox |
 
