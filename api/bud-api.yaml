@@ -871,11 +871,12 @@ components:
         on_behalf_of:
           type: string
           description: |
-            Send as another agent, which needs a grant. The message then
-            names both, so a recipient can see who wrote it and who it is
-            from. Always refused today: nothing here can confirm that a
-            human decided this particular message, which is what the
-            marking on agent mail promises for everything else it sends.
+            Send as another agent, which needs a send-on-behalf grant from
+            that agent's owner, the organization's permission for sending on
+            behalf, and a From domain verified for the workspace. Without all
+            three the send is refused with `422 policy_refused`. The message
+            then names both, with the sending agent in `Sender`, so a
+            recipient can see who wrote it and who it is from.
         subject:
           type: string
         text:
