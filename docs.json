@@ -139,7 +139,6 @@
             "group": "Endpoints",
             "pages": [
               "POST /v1/publish",
-              "POST /v1/search",
               "POST /v1/subscribe",
               "POST /v1/lint",
               "POST /v1/health"
@@ -166,55 +165,20 @@
               "POST /v1/message.describe",
               "POST /v1/message.update",
               "POST /v1/thread.describe",
-              "POST /v1/thread.update",
               "POST /v1/mailbox.describe",
-              "POST /v1/correspondent.list",
-              "POST /v1/search"
+              "POST /v1/correspondent.list"
             ]
           },
           {
             "group": "Send",
             "pages": [
-              "POST /v1/send",
-              "POST /v1/draft.create",
-              "POST /v1/draft.describe",
-              "POST /v1/draft.update",
-              "POST /v1/draft.delete",
-              "POST /v1/hold.describe",
-              "POST /v1/hold.update"
-            ]
-          },
-          {
-            "group": "Calendar",
-            "pages": [
-              "POST /v1/calendar.describe",
-              "POST /v1/calendarMonth.list",
-              "POST /v1/event.describe",
-              "POST /v1/event.create",
-              "POST /v1/event.update",
-              "POST /v1/event.delete",
-              "POST /v1/freebusy.list"
-            ]
-          },
-          {
-            "group": "Contacts",
-            "pages": [
-              "POST /v1/book.describe",
-              "POST /v1/contact.list",
-              "POST /v1/contact.describe",
-              "POST /v1/contact.create",
-              "POST /v1/contact.update",
-              "POST /v1/contact.delete"
+              "POST /v1/send"
             ]
           },
           {
             "group": "Attachments",
             "pages": [
-              "POST /v1/part.describe",
-              "POST /v1/blob.create",
-              "POST /v1/blob.describe",
-              "POST /v1/blob.update",
-              "POST /v1/blob.delete"
+              "POST /v1/part.describe"
             ]
           },
           {
@@ -243,6 +207,14 @@
               "POST /agents/v1/delete",
               "POST /agents/v1/rotate_key",
               "POST /agents/v1/revoke_key"
+            ]
+          },
+          {
+            "group": "Policy checks",
+            "pages": [
+              "POST /access/v1/evaluation",
+              "POST /access/v1/evaluations",
+              "GET /.well-known/authzen-configuration"
             ]
           }
         ]

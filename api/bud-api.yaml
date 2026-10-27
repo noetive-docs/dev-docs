@@ -3,9 +3,9 @@ info:
   title: Noetive Bud API
   version: 0.1.0
   description: |
-    Noetive Bud is a managed mail, calendar and addressbook service whose
-    first-class users are agents. People reach the same data through ordinary
-    mail and calendar clients; a program reaches it through this API.
+    Noetive Bud is email for AI agents. Each agent gets an address of its own
+    and a mailbox it reaches through this API, with sending limits it can read
+    and cannot raise.
 
     All request and response bodies are JSON. Every operation is a `POST`,
     including the ones that only read. The input is a document rather than a
@@ -13,27 +13,34 @@ info:
     filters into a URL. `/v1/watch` accepts a JSON `POST` and upgrades the
     response to a Server-Sent Events stream.
 
-    ## Four operations over one grammar
+    ## Four verbs over one way of naming things
 
-    Underneath the operation names below there are four verbs: **wait**,
-    **read**, **put** and **send**, over one uniform way of naming things.
-    That is why the surface does not grow an operation every time it grows a
-    kind of object. A client that has learned the grammar can reach what was
-    added after it was written.
+    The operations below are four verbs: **watch** for what happens,
+    **describe** and **list** to read, **update** to mark or label, and
+    **send**. Each operation acts on one kind of object, and the object's
+    identifier says which kind it is: `message_…`, `thread_…`, `ag_…` for an
+    agent and its mailbox. An identifier of another kind is refused rather
+    than guessed at.
 
-    `POST /v1/help.describe` returns the grammar itself, and
-    `POST /v1/catalog.describe` returns what this deployment serves. Both are
-    cheap and neither needs anything but a valid credential.
+    `POST /v1/help.describe` returns the naming grammar and what each kind
+    accepts, and `POST /v1/catalog.describe` returns what this deployment
+    serves. Both are cheap and neither needs anything but a valid credential.
 
     ## Identity and scope
 
-    Every request carries a bearer token. A token belongs to an agent, an
-    agent belongs to one account, and an agent reads and writes its own
-    mailbox, calendar and addressbook. A grant may extend that to another
-    agent's, never beyond the account.
+    Every request carries a bearer credential, either an API key
+    or an access token (a JWT the Noetive access service signed for this
+    service). Both name one agent, an agent belongs to one workspace, and an
+    agent reads and writes its own mailbox. A delegation from another agent may
+    extend that to its mailbox, never beyond the workspace.
 
-    There is no operation on this surface that creates an account, an agent or
-    a token. Those are administrative and are not reachable with an agent
+    An access token is a ceiling, not a grant: its scope can narrow what the
+    agent may do and never widen it. A token that acts for a person rather than
+    for the agent itself is refused on every operation with
+    `impersonation_not_supported`.
+
+    There is no operation on this surface that creates a workspace, an agent or
+    a credential. Those are administrative and are not reachable with an agent
     credential.
 
     ## Errors
@@ -45,33 +52,42 @@ info:
     | code | status | meaning |
     | --- | --- | --- |
     | `invalid` | 400 | The request is malformed or a field is wrong. `field` is a JSON pointer to it. |
+    | `invalid` | 405 | The operation exists and takes `POST`. The `Allow` header says so. |
     | `unauthorized` | 401 | The credential is missing, unknown, revoked or expired. |
     | `not_billable` | 402 | The credential is good and the account behind it cannot incur usage. |
-    | `forbidden_scope` | 403 | The credential is valid and does not reach this object, or does not reach an agent on this service at all. |
-    | `not_found` | 404 | No such object, or no such operation. |
-    | `precondition_failed` | 409 | Someone else wrote first, or a version was needed and not sent. `version` is the value to retry with. |
-    | `policy_refused` | 422 | A policy declined. The message says which. |
-    | `rate_limited` | 429 | A limit is spent. `retry_after_ms` says how long to wait. |
-    | `paused` | 503 | The mailbox is paused and is not sending. |
+    | `spend_cap_reached` | 402 | A spend cap on the organization, tenant or agent has been reached. Raise the cap or wait for its period; the payment method is not the problem. |
+    | `forbidden_scope` | 403 | The credential is valid and its agent is disabled, its account is not active, or it may not watch the mailbox, send, or send as the sender it named. |
+    | `impersonation_not_supported` | 403 | The token acts for a person, and no operation accepts that yet. |
+    | `approval_required` | 403 | A person has to approve this action before it can happen, and this operation cannot wait for one (a read). A send is never refused with this: it comes back `held`. |
+    | `not_found` | 404 | No such object, an object this credential does not reach, or no such operation. |
+    | `precondition_failed` | 409 | Another write to the same object kept landing first. Read it again and retry. |
+    | `policy_refused` | 422 | A policy declined. `guard` names which. |
+    | `rate_limited` | 429 | A limit is spent. `counter` names which, and `retry_after_ms` says how long to wait when waiting helps. |
+    | `quota_exceeded` | 429 | A usage quota for the period is used up. Waiting a second does not help; `counter` names which and `retry_after_ms` says when the window refills. |
+    | `paused` | 409 | The mailbox is paused and is not sending. Shares 409 with `precondition_failed`; the code tells them apart. |
     | `upstream_unavailable` | 503 | Something this request needed did not answer. Retry with backoff. |
-    | `unavailable` | 501 | This deployment does not implement the operation. Do not retry it. |
+    | `policy_unavailable` | 503 | The policy that governs this caller could not be applied, so nothing was done. Retry with backoff. |
+    | `unavailable` | 404 | This deployment does not serve this option of the operation. Do not retry it. |
     | `internal` | 500 | Something went wrong that is not about the request. |
+
+    An object this credential cannot reach is answered exactly as one that
+    does not exist, so a refusal never discloses what another account holds.
 
     Every response, successful or not, carries an `X-Request-Id` header, and a
     refusal repeats it as `error.request_id`. Quote it in a support request: it
     correlates the refusal with everything the request caused.
 
-    `unavailable` is deliberately 501 rather than 500. It means this build
-    never serves the operation without a new deployment, and retry policies
-    are written against statuses.
+    No refusal a caller can provoke is a 5xx. `unavailable` and `paused` are
+    answered with a 4xx, because a 5xx means this service failed and is what
+    its own health signals count; within one status, branch on the code.
 
     ### Only 401 means the credential is the problem
 
-    Four refusals concern the credential's surroundings rather than the
+    Several refusals concern the credential's surroundings rather than the
     credential, and only one of them is worth minting a new key over.
 
     Treat **401** as "this key never works": stop presenting it. `403`,
-    `402` and `upstream_unavailable` all mean the key itself is fine. It
+    `402`, `429` and `503` all mean the key itself is fine. It
     reaches no agent here, or the account cannot currently incur usage, or
     something the request needed did not answer. A client that reacts to those
     by discarding the key throws away a working credential and gets no further,
@@ -79,53 +95,49 @@ info:
     with the 401 and with nothing else. Branch on the header's presence if that
     is easier than branching on the status.
 
-    `upstream_unavailable` is the one to retry. It is transient by definition,
-    and the request had no effect.
+    `upstream_unavailable` and `policy_unavailable` are the ones to retry. They
+    are transient by definition, and the request had no effect.
 
     ## Limits
 
     | limit | value |
     | --- | --- |
-    | request body | 1 MiB, or 16 MiB for a blob create carrying its bytes inline |
+    | request body | 1 MiB |
     | JSON nesting depth | 64 |
+    | requests in flight per agent | a small fixed number; past it, `429 rate_limited` |
 
     A body over the limit is refused as `invalid` with a JSON envelope, not as
     a bare transport error, so one error path covers size and shape alike.
 
     ## Concurrency
 
-    An operation that changes a stored object takes a `version` and returns the
-    new one. Supplying the version you read is what makes an update a
-    compare-and-swap. Omitting it for an object that already exists is
-    `precondition_failed`, the same as a lost race, and both carry the
-    `version` to retry with. There is no blind overwrite, with one exception:
-    `message.update` changes read state, labels and folder without a version,
-    and its `labels` replace the message's labels whole, so two agents
-    labelling one message at once keep only the last write.
+    There are no versions to quote. `message.update` changes read state and
+    labels, and its `labels` replace the message's labels whole, so two agents
+    labelling one message at once keep the last write.
 
     ## Idempotency
 
-    `POST /v1/send` and the create, update and delete operations accept
-    `idempotency_key`. A repeat with the same key returns the first attempt's
-    result rather than doing the work again. A repeat that arrives while the
-    first attempt is still running is refused as `rate_limited`, with
-    `retry_after_ms` saying when to ask again. A key belongs to the agent that
-    sent it, and a refused or failed attempt does not spend it.
+    `send` and `message.update` accept `idempotency_key`. A repeat with the
+    same key returns the first attempt's result rather than doing the work
+    again. A repeat that arrives while the first attempt is still running is
+    refused as `rate_limited`, with `retry_after_ms` saying when to ask again.
+    A key belongs to the agent that sent it, and a refused or failed attempt
+    does not spend it.
 
     | operation | a repeat with the same key |
     | --- | --- |
     | `send` | returns the first send's result for seven days, through restarts, deployments and outages |
-    | every other write | is recognised on a best-effort basis for up to an hour |
+    | `message.update` | is recognised on a best-effort basis for up to an hour |
 
-    Outside `send`, a key can be forgotten sooner: after a service
+    For `message.update`, a key can be forgotten sooner: after a service
     interruption, or while the service is under heavy load. A forgotten key
     does the work again, exactly as if no key had been sent; it never returns
-    the result of a different request. Treat the key as protection against the
-    retry you make straight after a timeout, and make a retried create safe to
-    repeat: read before retrying, or delete the extra object.
+    the result of a different request. Marking read and replacing labels are
+    safe to repeat, so a forgotten key costs nothing but the call.
 
-    A key names one request. Never reuse one for a different request: on a
-    create, update or delete such a reuse is refused as `invalid`.
+    A key names one request. Never reuse one for a different request: on
+    `message.update` such a reuse is refused as `invalid`, and on `send` it
+    returns the first send's result and sends nothing.
 
 servers:
   - url: https://bud.noetive.io
@@ -138,13 +150,9 @@ tags:
   - name: Mail
     description: Read, file and reply to messages.
   - name: Send
-    description: Compose and send, with drafts and approval holds.
-  - name: Calendar
-    description: Calendars, events and free/busy.
-  - name: Contacts
-    description: Addressbooks and contacts.
+    description: Compose and send.
   - name: Attachments
-    description: Parts of received messages, and blobs to attach to sent ones.
+    description: Parts of received messages.
   - name: Events
     description: The live stream of what happened.
   - name: Discovery
@@ -160,17 +168,22 @@ paths:
       tags: [Mail]
       summary: List a folder
       description: |
-        Messages in one folder of one mailbox, newest first. `folder` is
-        `inbox`, `sent`, `quarantine` or another the mailbox has.
+        Messages in one folder of one mailbox, oldest first, in the order they
+        were filed. `folder` is `inbox` (the default), `sent` or `quarantine`.
 
         Use `cursor` to page. A listing is stable: a message that arrives
-        mid-page does not shuffle what you have already seen.
+        mid-page is filed after everything you have already seen, so it
+        appears on a later page rather than shuffling this one.
+
+        `limit` bounds how many messages are examined, not how many match. With
+        a filter, a page can come back short or empty and still carry a
+        `cursor`: keep paging until there is none.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ListRequest'
+              $ref: '#/components/schemas/FolderListRequest'
       responses:
         '200':
           $ref: '#/components/responses/Read'
@@ -178,6 +191,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/message.describe:
@@ -198,7 +214,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DescribeRequest'
+              $ref: '#/components/schemas/DescribeMessageRequest'
       responses:
         '200': { $ref: '#/components/responses/Read' }
         '400': { $ref: '#/components/responses/Invalid' }
@@ -206,14 +222,22 @@ paths:
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/message.update:
     post:
       operationId: updateMessage
       tags: [Mail]
-      summary: File or flag a message
-      description: Move a message between folders, or mark it read.
+      summary: Mark or label a message
+      description: |
+        Mark a message read, or replace its labels. `effects` in the result
+        says what changed.
+
+        A `409` means other label writes kept landing first. A `read` change in
+        the same request may already have been applied; the request is safe to
+        repeat as it is.
       requestBody:
         required: true
         content:
@@ -229,6 +253,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/thread.describe:
@@ -236,39 +261,26 @@ paths:
       operationId: describeThread
       tags: [Mail]
       summary: Read a conversation
+      description: |
+        The conversation's most recent messages, rendered in the order they
+        were sent. Each message is cut at 4000 characters; read one with
+        message.describe for the whole of it. `truncated` says that older
+        messages were left out, not that one was cut.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DescribeRequest'
+              $ref: '#/components/schemas/DescribeThreadRequest'
       responses:
         '200': { $ref: '#/components/responses/Read' }
         '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/thread.update:
-    post:
-      operationId: updateThread
-      tags: [Mail]
-      summary: Close or assign a conversation
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/mailbox.describe:
@@ -276,18 +288,25 @@ paths:
       operationId: describeMailbox
       tags: [Mail]
       summary: Describe a mailbox
-      description: Its addresses, its folders, and what it is currently allowed to send.
+      description: |
+        Its addresses (the first is the default), its folders, its limits,
+        and what it is currently allowed to send.
+        `sending` carries the same status as me.describe.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DescribeRequest'
+              $ref: '#/components/schemas/DescribeMailboxRequest'
       responses:
         '200': { $ref: '#/components/responses/Read' }
+        '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/correspondent.list:
@@ -303,30 +322,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ListRequest'
+              $ref: '#/components/schemas/CorrespondentListRequest'
       responses:
         '200': { $ref: '#/components/responses/Read' }
+        '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/search:
-    post:
-      operationId: searchMail
-      tags: [Mail]
-      summary: Search mail
-      description: |
-        Not served by this deployment. It answers `501 unavailable`; check
-        `POST /v1/catalog.describe` rather than assuming.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ListRequest'
-      responses:
-        '501': { $ref: '#/components/responses/Unimplemented' }
 
   # ── Send ─────────────────────────────────────────────────────────
   /v1/send:
@@ -340,20 +346,23 @@ paths:
         them from a rendering: a rendering is partly what a sender chose.
 
         A send is subject to the mailbox's limits and policy. Three outcomes
-        are normal and distinguishable: it is `queued`, it is `held`, or it is
-        refused with `422 policy_refused` and `guard` naming the rule that
-        fired. Neither a hold nor a refusal is worth retrying unchanged.
-        Retrying is how one held message becomes five.
-
-        No agent can approve a held message in this deployment (see
-        `hold.update`), so a hold ends in rejection when it expires, after
-        72 hours unless the account set otherwise. A mailbox created on a
-        customer's first request has nobody to approve its mail, so what would
-        be held for it is refused instead, and the agent learns at once which
-        rule fired.
+        are normal and distinguishable: it is `queued`; it is `held`, because
+        a rule of the workspace's policy needs a person to approve it first
+        (the result carries `approval_id`, and the message goes out when a
+        person approves it and never otherwise); or it is refused with
+        `422 policy_refused` and `guard` naming the rule that fired. A held
+        message has spent its sending budget; the budget is given back if it
+        is rejected or lapses. Nothing you can send releases a held message:
+        only a person the workspace named can, so do not resend it. If the
+        policy that governs the sender cannot be applied the send is refused
+        with `503 policy_unavailable` and nothing is done. A refusal is not
+        worth retrying unchanged.
 
         Pass `idempotency_key` on every send. Without one, a timeout you retry
         is a second message.
+
+        `remaining` in the result is what is left of each sending limit, so an
+        agent can pace itself rather than discover a limit by reaching it.
       requestBody:
         required: true
         content:
@@ -366,406 +375,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Paused' }
         '422': { $ref: '#/components/responses/PolicyRefused' }
         '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/Paused' }
-
-  /v1/draft.create:
-    post:
-      operationId: createDraft
-      tags: [Send]
-      summary: Create a draft
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/draft.describe:
-    post:
-      operationId: describeDraft
-      tags: [Send]
-      summary: Read a draft
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/draft.update:
-    post:
-      operationId: updateDraft
-      tags: [Send]
-      summary: Revise a draft
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/draft.delete:
-    post:
-      operationId: deleteDraft
-      tags: [Send]
-      summary: Discard a draft
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/hold.describe:
-    post:
-      operationId: describeHold
-      tags: [Send]
-      summary: Read a held message
-      description: |
-        A message waiting on approval, and why it is waiting.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/hold.update:
-    post:
-      operationId: decideHold
-      tags: [Send]
-      summary: Approve or reject a held message
-      description: |
-        The decision is recorded against the deciding agent. A sender
-        cannot approve its own message: that is the whole reason a hold
-        exists.
-
-        No credential carries a decision over another agent's mailbox in this
-        deployment, so every decision, approve or reject, is refused: the
-        sender with `403`, anybody else with `404`. A held message is
-        rejected when it expires.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  # ── Calendar ─────────────────────────────────────────────────────
-  /v1/calendar.describe:
-    post:
-      operationId: describeCalendar
-      tags: [Calendar]
-      summary: Describe a calendar
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/calendarMonth.list:
-    post:
-      operationId: listCalendarMonth
-      tags: [Calendar]
-      summary: List a month of events
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [in, month]
-              properties:
-                in:
-                  type: string
-                  description: The calendar.
-                  example: calendar_01j9x2v8k3e0080000000000
-                month:
-                  type: string
-                  description: Which month, as `YYYY-MM`.
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/event.describe:
-    post:
-      operationId: describeEvent
-      tags: [Calendar]
-      summary: Read an event
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/event.create:
-    post:
-      operationId: createEvent
-      tags: [Calendar]
-      summary: Create an event
-      description: |
-        An event with `attendees` is not served by this deployment. Inviting
-        someone means sending a scheduling message, which it does not do. It
-        answers `501 unavailable`; an event without attendees is created
-        normally.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '501': { $ref: '#/components/responses/Unimplemented' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/event.update:
-    post:
-      operationId: updateEvent
-      tags: [Calendar]
-      summary: Change an event
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/event.delete:
-    post:
-      operationId: deleteEvent
-      tags: [Calendar]
-      summary: Delete an event
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/freebusy.list:
-    post:
-      operationId: listFreeBusy
-      tags: [Calendar]
-      summary: Free and busy over a window
-      description: Busy intervals only, never what the events are.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ListRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  # ── Contacts ─────────────────────────────────────────────────────
-  /v1/book.describe:
-    post:
-      operationId: describeBook
-      tags: [Contacts]
-      summary: Describe an addressbook
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/contact.list:
-    post:
-      operationId: listContacts
-      tags: [Contacts]
-      summary: List or look up contacts
-      description: |
-        With `q`, looks up by address, which is how a sender becomes a name
-        rather than a string.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ListRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/contact.describe:
-    post:
-      operationId: describeContact
-      tags: [Contacts]
-      summary: Read a contact
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/contact.create:
-    post:
-      operationId: createContact
-      tags: [Contacts]
-      summary: Create a contact
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/contact.update:
-    post:
-      operationId: updateContact
-      tags: [Contacts]
-      summary: Change a contact
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/contact.delete:
-    post:
-      operationId: deleteContact
-      tags: [Contacts]
-      summary: Delete a contact
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   # ── Attachments ──────────────────────────────────────────────────
@@ -776,99 +390,37 @@ paths:
       summary: Read one part of a message
       description: |
         An attachment or a body part, returned inline.
+
+        `mode: text` (the default) renders a part that is already text —
+        `text/*`, JSON, XML, a forwarded message — the way a message body is
+        rendered, under the same banner and with the same defences; HTML is
+        converted to text. At most the first 2 MiB of the part is read: a longer
+        one comes back cut, with `truncated`, and there is no cursor to continue
+        from. Any other type is `unavailable` in this mode: read it with
+        `mode: bytes`.
+
+        `mode: bytes` returns the part's decoded bytes, standard base64, as
+        `content.bytes_base64`, beside its `type`, `filename` and `size`. A part too large to return whole is refused with
+        `422 policy_refused` and `guard: part_size` rather than cut short. A
+        message withheld because it carries malware refuses every part, in
+        either mode, with `guard: virus`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DescribeRequest'
+              $ref: '#/components/schemas/DescribePartRequest'
       responses:
         '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '501': { $ref: '#/components/responses/Unimplemented' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/blob.create:
-    post:
-      operationId: createBlob
-      tags: [Attachments]
-      summary: Upload a blob
-      description: |
-        Bytes for an attachment, carried inline in this request.
-
-        This deployment does not attach a blob to a send, and does not remove
-        a blob nobody attached.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
         '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '501': { $ref: '#/components/responses/Unimplemented' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/blob.describe:
-    post:
-      operationId: describeBlob
-      tags: [Attachments]
-      summary: Describe a blob
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DescribeRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Read' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/blob.update:
-    post:
-      operationId: updateBlob
-      tags: [Attachments]
-      summary: Finish or amend a blob
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateRequest'
-      responses:
-        '200': { $ref: '#/components/responses/Write' }
-        '400': { $ref: '#/components/responses/Invalid' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '402': { $ref: '#/components/responses/NotBillable' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/PolicyRefused' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
-
-  /v1/blob.delete:
-    post:
-      operationId: deleteBlob
-      tags: [Attachments]
-      summary: Delete a blob
-      description: |
-        Not served by this deployment. It answers `501 unavailable`.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteRequest'
-      responses:
-        '501': { $ref: '#/components/responses/Unimplemented' }
 
   # ── Events ───────────────────────────────────────────────────────
   /v1/watch:
@@ -879,29 +431,34 @@ paths:
       description: |
         Opens a Server-Sent Events stream of everything that happens in the
         mailboxes this credential can read: mail arriving, a send leaving, a
-        hold waiting on somebody, a delivery outcome returning.
+        delivery outcome returning.
 
-        Pass the `cursor` from the last event you processed to resume exactly
+        Pass the `cursor` from the last frame you processed to resume exactly
         where you stopped. An empty cursor starts at the tail, which is what a
         fresh client wants: one cheap call for a usable cursor instead of
         replaying history.
 
-        Every event carries a cursor. Store it only after you have acted on the
-        event, or a crash between the two loses the event.
+        Every frame carries a cursor, and each event carries `seq`, its
+        position in its mailbox. Store a frame's cursor only after you have
+        acted on its events, or a crash between the two loses them.
 
         The stream is three kinds of line. It always starts with an `open`
-        frame carrying the cursor you supplied. Without one, the stream starts
-        at the latest event and you have no resumable position until the first
-        `batch`; to resume without a gap, call `wait` first and stream from its
-        cursor. Each `batch` frame carries events and the cursor after them. A
-        `: keepalive` comment arrives while nothing is happening, so a silent
-        connection is distinguishable from a dead one.
+        frame carrying the cursor the stream starts from: yours, re-encoded for
+        the mailboxes in scope, with the current tail for every mailbox it does
+        not name. Store it, and a reconnect misses nothing even if no `batch`
+        ever arrived. Each `batch` frame carries events and the cursor after
+        them. A `: keepalive` comment arrives while nothing is happening, so a
+        silent connection is distinguishable from a dead one.
+
+        The `data` of an `open` frame is a `WatchOpenFrame`, and of a `batch`
+        frame a `WatchBatchFrame`.
 
         A request that is wrong is refused before the stream opens, with an
-        ordinary JSON error: a cursor that does not parse is `400`, a
-        credential that reaches no mailbox is `403`. An error after `open` is a
-        failure in flight, arrives as a `batch` frame carrying `error`, and ends
-        the stream.
+        ordinary JSON error: a cursor that does not parse or an unknown event
+        type is `400`, a mailbox this credential cannot read is `403`. An error
+        after `open` is a failure in flight, arrives as a `batch` frame
+        carrying `error` and the cursor the stream had reached, and ends the
+        stream: store that cursor and reconnect with it.
 
         It stays open until you disconnect or the server is replaced; reconnect
         with your last cursor and nothing is lost.
@@ -928,14 +485,16 @@ paths:
                     : keepalive
 
                     event: batch
-                    data: {"cursor":"42","events":[{"type":"mail.received","mailbox":"ag_...","message":"message_..."}]}
+                    data: {"cursor":"42","events":[{"id":"journal_...","workspace":"workspace_...","ts":"2026-01-02T15:04:05Z","seq":42,"type":"mail.received","mailbox":"ag_...","message":"message_...","thread":"thread_...","actor":{"kind":"system","agent":""},"data":{"from":"anna@example.net","subject":"Order #1234","aligned":true,"folder":"inbox"}}]}
 
                     event: batch
-                    data: {"cursor":"43","events":[{"type":"mail.sent","mailbox":"ag_...","message":"message_..."}]}
+                    data: {"cursor":"43","events":[{"id":"journal_...","workspace":"workspace_...","ts":"2026-01-02T15:04:09Z","seq":43,"type":"mail.sent","mailbox":"ag_...","message":"message_...","thread":"thread_...","actor":{"kind":"agent","agent":"ag_..."},"data":{"state":"sent"}}]}
         '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   # ── Discovery ────────────────────────────────────────────────────
@@ -945,8 +504,13 @@ paths:
       tags: [Discovery]
       summary: Who this credential is
       description: |
-        The agent, its addresses, its mailbox, calendars and addressbook,
-        and what it may reach. The first call a client should make.
+        The agent, its addresses, its mailbox, and what it may reach. The
+        first call a client should make.
+
+        `sending` says whether mail sent now goes out now: `ready`,
+        `provisioning` while the sending domain verifies (mail is accepted and
+        waits), or `paused` by an operator (a send is refused), with a
+        `reason`.
       requestBody:
         required: false
         content:
@@ -955,8 +519,12 @@ paths:
               type: object
       responses:
         '200': { $ref: '#/components/responses/Read' }
+        '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/help.describe:
@@ -975,8 +543,12 @@ paths:
               type: object
       responses:
         '200': { $ref: '#/components/responses/Read' }
+        '400': { $ref: '#/components/responses/Invalid' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /v1/catalog.describe:
@@ -986,7 +558,7 @@ paths:
       summary: What this deployment serves
       description: |
         Each kind, whether it can be read, and whether this deployment serves
-        it. Ask this rather than discovering a `501` in the middle of a task.
+        it. Ask this rather than discovering a refusal in the middle of a task.
       requestBody:
         required: false
         content:
@@ -1002,6 +574,8 @@ paths:
                 type: object
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   # ── Health ───────────────────────────────────────────────────────
@@ -1027,8 +601,22 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [contract, agent, workspace]
+                properties:
+                  contract:
+                    type: string
+                    description: The version of this API the deployment speaks.
+                  agent:
+                    type: string
+                    description: The agent this credential is.
+                    example: ag_01j9x2v8k3e0080000000000
+                  workspace:
+                    type: string
+                    description: The account the agent belongs to.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 
   /health:
@@ -1076,105 +664,164 @@ components:
       type: http
       scheme: bearer
       description: |
-        Bearer token for one agent. Pass as
-        `Authorization: Bearer <token>`.
+        Bearer credential for one agent: an API key or an access
+        token (a JWT). Pass as `Authorization: Bearer <credential>`.
 
-        A token is shown once when it is issued and is not recoverable
-        afterwards. Treat it as a secret: it reaches one agent's mail,
-        calendar and contacts, and anything a grant has extended to it.
+        A key is shown once when it is issued and is not recoverable
+        afterwards; an access token lives five minutes and is fetched with the
+        agent's own client key from the access service. Treat both as secrets:
+        they reach one agent's mail, and anything a delegation has extended to
+        it. An access token's scope is a ceiling on what the agent may do with
+        it.
 
   schemas:
-    DescribeRequest:
+    DescribeMessageRequest:
       type: object
       required: [id]
       properties:
         id:
           type: string
           description: |
-            The object, by its identifier. The identifier says which kind it
+            The message, by its identifier. The identifier says which kind it
             is, so there is no second field to route on, and an identifier of
             the wrong kind is refused rather than guessed at.
           example: message_01j9x2v8k3e0080000000000
-        part:
-          type: string
-          description: For a message, which part to read.
-        uid:
-          type: string
-          description: For a calendar, which event.
-        contact:
-          type: string
-          description: For an addressbook, which contact.
         render:
           type: string
-          description: How to render the content.
+          enum: [text, raw, parts]
+          description: |
+            `text` (the default) is the safe rendering. `raw` is the original
+            message as it arrived. `parts` lists its structure, with the part
+            numbers part.describe takes.
         max_chars:
           type: integer
           description: |
-            Truncate the rendering. A truncated response says how to continue
-            rather than silently stopping.
+            Truncate the rendering. At most, and by default, 20000. A truncated
+            response carries `truncated` and a `cursor` to continue from,
+            rather than silently stopping. Ignored with `render: raw`.
         cursor:
           type: string
           description: Continue a truncated rendering.
+        quoted:
+          type: boolean
+          description: |
+            Not served: quoted history stays folded, and asking for it is
+            `unavailable`. Read with `render: raw` for the original.
 
-    ListRequest:
+    DescribeThreadRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: The conversation, by its identifier.
+          example: thread_01j9x2v8k3e0080000000000
+        max_messages:
+          type: integer
+          description: |
+            How many of the most recent messages to render. Default 20, at
+            most 50.
+
+    DescribePartRequest:
+      type: object
+      required: [id, part]
+      properties:
+        id:
+          type: string
+          description: The message the part belongs to.
+          example: message_01j9x2v8k3e0080000000000
+        part:
+          type: string
+          description: |
+            The part number, as `render: parts` on message.describe lists it.
+          example: '2'
+        mode:
+          type: string
+          enum: [text, bytes, message]
+          description: |
+            `text` (the default) or `bytes`; see the operation. `message`, to
+            read a forwarded message as its own object, is `unavailable`.
+
+    DescribeMailboxRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: The agent whose mailbox to describe.
+          example: ag_01j9x2v8k3e0080000000000
+
+    FolderListRequest:
       type: object
       required: [in]
       properties:
         in:
           type: string
-          description: What to list within, a mailbox, a calendar, an addressbook.
+          description: The mailbox, by its agent's identifier.
           example: ag_01j9x2v8k3e0080000000000
         folder:
           type: string
-          description: Which folder.
-          example: inbox
+          enum: [inbox, sent, quarantine]
+          description: Which folder. Default `inbox`.
         unread:
           type: boolean
-          description: Only unread messages.
+          description: |
+            `true` for only messages not yet marked read. `false` is no filter,
+            the same as leaving it out.
         agent:
           type: boolean
-          description: Only messages carrying a machine-readable part.
+          description: |
+            `true` for only messages carrying a machine-readable part. `false`
+            is no filter, the same as leaving it out.
         since:
           type: string
           format: date-time
+          description: |
+            Only messages dated at or after this instant, RFC 3339. Anything
+            else is refused rather than read as a different window.
         before:
           type: string
           format: date-time
+          description: Only messages dated before this instant, RFC 3339.
         from:
           type: string
-          description: Restrict to one sender.
+          description: Only messages from this address.
         thread:
           type: string
-          description: Restrict to one conversation.
-        q:
-          type: string
-          description: Look up by address, for contacts.
+          description: Only messages in this conversation.
+          example: thread_01j9x2v8k3e0080000000000
         limit:
           type: integer
-          description: How many to return.
+          description: |
+            How many messages to examine for this page. Default 50, at most
+            200; a larger value is treated as 200.
         cursor:
           type: string
-          description: Resume a listing.
-        max_chars:
-          type: integer
+          description: |
+            Resume a listing. Pass back, unchanged, the `cursor` a previous
+            page of the same operation returned; cursors are opaque, and one
+            operation's cursor means nothing to another.
 
-    CreateRequest:
+    CorrespondentListRequest:
       type: object
-      required: [body]
+      required: [in]
       properties:
         in:
           type: string
-          description: What to create it within, where the kind needs one.
-        body:
-          type: object
-          description: |
-            The object itself. Its shape depends on what is being created;
-            `POST /v1/help.describe` gives the shape for each.
-        idempotency_key:
+          description: The mailbox, by its agent's identifier.
+          example: ag_01j9x2v8k3e0080000000000
+        q:
           type: string
+          description: Only addresses containing this text, ignoring case.
+        limit:
+          type: integer
           description: |
-            Makes a repeat return the first attempt's result rather than
-            creating a second object.
+            How many correspondents to examine for this page. Default 50, at
+            most 200. With `q`, a page can come back short or empty and still
+            carry a `cursor`: keep paging until there is none.
+        cursor:
+          type: string
+          description: Resume a listing, from the `cursor` the last page returned.
 
     UpdateRequest:
       type: object
@@ -1182,57 +829,34 @@ components:
       properties:
         id:
           type: string
-          description: The object to change.
+          description: The message to change.
+          example: message_01j9x2v8k3e0080000000000
         changes:
           type: object
-          description: |
-            The fields to change. `POST /v1/help.describe` gives the shape for
-            each kind.
-        version:
-          type: string
-          description: |
-            The version you read. Supplying it makes the update a
-            compare-and-swap; a lost race is `409 precondition_failed` and
-            carries the object as stored.
-        idempotency_key:
-          type: string
-
-    DeleteRequest:
-      type: object
-      description: |
-        Names the object the same way its describe operation does: `id` for a
-        draft or a blob, `in` with `uid` for an event, `in` with `contact` for
-        a contact.
-      properties:
-        id:
-          type: string
-          description: The draft or blob.
-        in:
-          type: string
-          description: The calendar or addressbook holding the object.
-        uid:
-          type: string
-          description: For an event, which one.
-        contact:
-          type: string
-          description: For a contact, which one.
-        version:
-          type: string
-          description: |
-            The version you read. A delete is a compare-and-swap like any other
-            write: a stale version, or none for an object that exists, is
-            `409 precondition_failed`.
+          description: The fields to change. At least one.
+          properties:
+            read:
+              type: boolean
+              description: Mark the message read, or unread.
+            labels:
+              type: array
+              items: { type: string }
+              description: |
+                The message's labels, whole. Replaces what is there, so an
+                empty list removes them all.
         idempotency_key:
           type: string
 
     SendRequest:
       type: object
-      required: [to]
       properties:
         to:
           type: array
           items: { type: string }
-          description: Recipients.
+          description: |
+            Recipients. May be omitted on a reply, which takes them from the
+            message being replied to. A send with no recipients at all is
+            refused.
         cc:
           type: array
           items: { type: string }
@@ -1249,8 +873,9 @@ components:
           description: |
             Send as another agent, which needs a grant. The message then
             names both, so a recipient can see who wrote it and who it is
-            from, and policy usually holds it for approval, which is the
-            point of the distinction.
+            from. Always refused today: nothing here can confirm that a
+            human decided this particular message, which is what the
+            marking on agent mail promises for everything else it sends.
         subject:
           type: string
         text:
@@ -1267,16 +892,52 @@ components:
           description: |
             The message this replies to. It is what puts the reply in a
             conversation.
+          example: message_01j9x2v8k3e0080000000000
         reply_all:
           type: boolean
           description: |
             Compute recipients from the message being replied to, minus the
             caller's own addresses.
+        agent:
+          $ref: '#/components/schemas/AgentPart'
         idempotency_key:
           type: string
           description: |
             Strongly recommended. A repeat with the same key returns the first
             attempt's result rather than sending a second message.
+
+    AgentPart:
+      type: object
+      description: |
+        A machine-readable part, for an exchange between two agents. It travels
+        with the message beside the text, and the receiving side can filter on
+        it. Keys outside this shape are dropped, not carried.
+      properties:
+        bud:
+          type: integer
+          description: The version of this envelope, carried as sent.
+        intent:
+          type: string
+          description: What this message asks of the recipient.
+        corr:
+          type: string
+          description: Your identifier for this exchange.
+        in_reply_to_corr:
+          type: string
+          description: The `corr` of the message this answers.
+        schema:
+          type: string
+          description: Names the shape of `payload`.
+        hops:
+          type: integer
+          description: |
+            How many messages this exchange has taken so far. Send the count
+            from the message you are answering: the server adds one to it
+            before the message leaves, and a mailbox's policy bounds it.
+        payload:
+          description: The content, as any JSON value.
+        expect:
+          description: Not carried by this server, and refused if present.
 
     WatchRequest:
       type: object
@@ -1290,6 +951,7 @@ components:
           description: |
             Narrow to one mailbox. Empty means every mailbox this credential
             can read.
+          example: ag_01j9x2v8k3e0080000000000
         timeout_s:
           type: integer
           description: |
@@ -1297,13 +959,128 @@ components:
             seconds, at most 25. It does not end the stream.
         types:
           type: array
-          items: { type: string }
+          items: { $ref: '#/components/schemas/EventType' }
           description: |
-            Only these event types. Empty matches everything.
+            Only these event types. Empty matches everything; an unknown type
+            is refused.
           example: [mail.received, mail.bounced]
         agent_part:
           type: boolean
-          description: Only messages carrying a machine-readable part.
+          description: |
+            `true` for only messages carrying a machine-readable part, `false`
+            for only messages without one. Absent matches both.
+
+    WatchOpenFrame:
+      type: object
+      required: [cursor]
+      properties:
+        cursor:
+          type: string
+          description: Where this stream starts. Store it.
+
+    WatchBatchFrame:
+      type: object
+      required: [cursor]
+      properties:
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/Event' }
+        cursor:
+          type: string
+          description: Where the stream stands after these events.
+        error:
+          $ref: '#/components/schemas/Error'
+
+    EventType:
+      type: string
+      enum:
+        - mail.received
+        - mail.quarantined
+        - mail.queued
+        - mail.held
+        - mail.approved
+        - mail.rejected
+        - mail.sent
+        - mail.delivered
+        - mail.bounced
+        - mail.complained
+        - mail.read
+        - render.failed
+      description: |
+        `mail.received` and `mail.quarantined` are mail arriving, the second
+        filed in quarantine. `mail.queued`, `mail.held`, `mail.approved`, `mail.rejected`,
+        `mail.sent`, `mail.delivered`, `mail.bounced` and `mail.complained`
+        follow a send: accepted, held for a person, released by a person,
+        refused or lapsed while held (the budget is given back), handed to the
+        provider, accepted by the receiving side, refused for good, reported as
+        unwanted. `mail.read` is a message marked read or unread.
+        `render.failed` means a rendering was withheld as unsafe and a
+        degraded one shown instead.
+
+    Event:
+      type: object
+      description: |
+        One thing that happened. It carries metadata, never content: what
+        little a sender chose (`from`, `subject`) is capped and sanitised.
+      required: [id, seq, type, mailbox]
+      properties:
+        id:
+          type: string
+        workspace:
+          type: string
+          description: The account it happened in.
+        ts:
+          type: string
+          format: date-time
+        seq:
+          type: integer
+          description: Its position in its mailbox's sequence of events.
+        type:
+          $ref: '#/components/schemas/EventType'
+        mailbox:
+          type: string
+        message:
+          type: string
+          description: The message it is about, if any; empty otherwise.
+        thread:
+          type: string
+          description: The conversation it is about, if any; empty otherwise.
+        actor:
+          type: object
+          properties:
+            kind:
+              type: string
+              enum: [system, agent, operator]
+            agent:
+              type: string
+              description: The agent that acted, when `kind` is `agent`.
+        corr:
+          type: string
+          description: |
+            Ties this event to the request that caused it and to the other
+            events that request caused.
+        data:
+          type: object
+          properties:
+            from: { type: string }
+            subject: { type: string }
+            aligned: { type: boolean }
+            in_workspace: { type: boolean }
+            known: { type: boolean }
+            agent_part: { type: boolean }
+            folder: { type: string }
+            guard: { type: string }
+            counter: { type: string }
+            reason: { type: string }
+            state: { type: string }
+            provider:
+              type: string
+              description: An opaque delivery reference for a message that was handed on.
+            message_id:
+              type: string
+              description: |
+                On `mail.sent`, the Message-ID the message went out under: the
+                one a recipient sees and quotes back in a reply.
 
     ReadResult:
       type: object
@@ -1327,6 +1104,9 @@ components:
         cursor:
           type: string
           description: Present when there is more to read.
+        truncated:
+          type: boolean
+          description: There is more than this response carries.
         error:
           $ref: '#/components/schemas/Error'
 
@@ -1337,9 +1117,20 @@ components:
           type: string
         created:
           type: boolean
-        version:
-          type: string
-          description: The new version, to supply on the next update.
+        effects:
+          type: array
+          description: What the write changed.
+          items:
+            type: object
+            required: [kind]
+            properties:
+              kind:
+                type: string
+                enum: [mail.read, labelled]
+              count:
+                type: integer
+              ref:
+                type: string
         error:
           $ref: '#/components/schemas/Error'
 
@@ -1348,35 +1139,83 @@ components:
       properties:
         state:
           type: string
-          enum: [queued, held, rejected]
+          enum: [queued, sending, sent, delivered, bounced, failed, held, rejected]
           description: |
-            `queued` means accepted for delivery. `held` means it is waiting on
-            an approval and must not be retried. `rejected` means it is not
-            sent.
+            A new send is `queued`: accepted for delivery, returned as soon as
+            the message is durably queued and before it is handed on. A repeat
+            with the same `idempotency_key` reports the message's state now,
+            which may be any later one. `held` is a message waiting for a
+            person to approve it, with `approval_id`; it becomes `queued` when
+            approved and `rejected` when a person refuses it or the wait
+            lapses. A send that a guard refuses comes back as an error
+            instead of a result.
+        approval_id:
+          type: string
+          description: |
+            The approval a held message is waiting on. Absent until the request
+            for approval has been filed, which is retried in the background;
+            the message is held either way.
         message:
           type: string
-          description: The message's identifier, once it has one.
+          description: The message's identifier.
+        thread:
+          type: string
+          description: The conversation it belongs to.
         reason:
           type: string
-          description: Why, when it is held or rejected.
+          description: |
+            On a queued message, why it waits instead of going now:
+            `provisioning` while the sender's domain is being verified (it goes
+            out once it is), or `paused`. On a repeat for a message that
+            failed, why it failed. Absent when nothing is in the way.
+        remaining:
+          type: object
+          additionalProperties: { type: integer }
+          description: |
+            What is left of each sending limit this send counted against, by
+            limit name.
         error:
           $ref: '#/components/schemas/Error'
 
     Provenance:
       type: object
       description: |
-        Where the content came from and what was removed from it. Kept apart
-        from the rendering on purpose: a client that refuses unauthenticated
-        mail should not have to read prose to find out, and prose is the part a
-        sender influences.
+        Where the content came from. Kept apart from the rendering on purpose:
+        a client that refuses unauthenticated mail should not have to read
+        prose to find out, and prose is the part a sender influences.
+      required: [aligned, in_workspace, known]
       properties:
-        authenticated:
+        spf:
+          type: string
+          description: The SPF verdict the message arrived with.
+        dkim:
+          type: string
+          description: |
+            `pass` when a DKIM signature verified; otherwise the result of the
+            check, such as `fail` or `none`.
+        dmarc:
+          type: string
+          description: The DMARC verdict the message arrived with.
+        aligned:
           type: boolean
-          description: Whether the message's sender was verified.
-        removed:
-          type: array
-          items: { type: string }
-          description: What was stripped from the content before rendering.
+          description: |
+            The authenticated domain matches the visible sender. The one to
+            gate on.
+        in_workspace:
+          type: boolean
+          description: |
+            Sent, demonstrably, from an address of another agent in the same
+            account.
+        known:
+          type: boolean
+          description: This mailbox has exchanged mail with the sender before.
+        thread_join:
+          type: string
+          enum: [new, verified, claimed]
+          description: |
+            How the message joined its conversation: it started one, it is a
+            reply from someone the conversation already involves, or it only
+            claims to be a reply.
 
     Error:
       type: object
@@ -1388,13 +1227,18 @@ components:
             - invalid
             - unauthorized
             - not_billable
+            - spend_cap_reached
             - forbidden_scope
+            - impersonation_not_supported
+            - approval_required
             - not_found
             - precondition_failed
             - policy_refused
             - rate_limited
+            - quota_exceeded
             - paused
             - upstream_unavailable
+            - policy_unavailable
             - unavailable
             - internal
         message:
@@ -1408,6 +1252,12 @@ components:
           description: |
             A JSON pointer to the offending field, on `invalid`.
           example: /id
+        guard:
+          type: string
+          description: Which rule refused, on `policy_refused`.
+        counter:
+          type: string
+          description: Which limit is spent, on `rate_limited`.
         request_id:
           type: string
           description: |
@@ -1416,22 +1266,22 @@ components:
             request.
         retry_after_ms:
           type: integer
-          description: How long to wait, on `rate_limited`.
-        version:
-          type: string
-          description: The version to retry with, on `precondition_failed`.
-        current:
-          type: object
           description: |
-            Sometimes present on `precondition_failed`: the object as stored.
-            Do not rely on it; read the object again when it is absent.
+            How long to wait, on `rate_limited`. Absent when waiting will not
+            help, such as a send with more recipients than the limit allows.
 
     ErrorEnvelope:
       type: object
       required: [error]
+      description: |
+        A refusal. It may also carry the `ref` and `kind` that were asked for.
       properties:
         error:
           $ref: '#/components/schemas/Error'
+        ref:
+          type: string
+        kind:
+          type: string
 
   responses:
     Read:
@@ -1448,8 +1298,9 @@ components:
             $ref: '#/components/schemas/WriteResult'
     Send:
       description: |
-        The send was accepted, held, or refused. Read `state`: a `200` here
-        does not mean the message left.
+        The send was accepted for delivery. A `200` here does not mean the
+        message left — a guard that would refuse it does so as an error
+        response instead, before this result is ever built.
       content:
         application/json:
           schema:
@@ -1490,9 +1341,11 @@ components:
             $ref: '#/components/schemas/ErrorEnvelope'
     Forbidden:
       description: |
-        The credential is valid and does not reach what was asked for, either
-        this object, or any agent on this service. The key is fine; its reach is
-        not.
+        The credential is valid and does not reach what was asked for: its agent
+        is disabled or not on this service, it may not watch the mailbox it
+        named, or it may not send as the sender it named. The key is fine; its
+        reach is not. An object or mailbox it cannot read is answered `404`,
+        not this.
       content:
         application/json:
           schema:
@@ -1506,16 +1359,18 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
     NotFound:
-      description: No such object, or no such operation.
+      description: |
+        No such object, or no such operation — or, with code `unavailable`, an
+        option of the operation this deployment does not serve. Do not retry
+        an `unavailable`.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
     Conflict:
       description: |
-        Someone else wrote first, or a version was needed and not sent.
-        `version` is the value to retry with; read the object again before
-        retrying, so the retry is decided against what is stored now.
+        Other writes to the same object kept landing first. Read it again and
+        retry, so the retry is decided against what is stored now.
       content:
         application/json:
           schema:
@@ -1527,7 +1382,10 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
     RateLimited:
-      description: A limit is spent. `retry_after_ms` says how long to wait.
+      description: |
+        A limit is spent. `counter` names which, and `retry_after_ms` says how
+        long to wait. Without `retry_after_ms`, waiting will not help: change
+        the request.
       content:
         application/json:
           schema:
@@ -1536,20 +1394,18 @@ components:
       description: |
         The mailbox is paused and is not sending.
 
-        Two codes share this status on this operation, and the `code` member is
-        what tells them apart: `paused` is a decision somebody made about this
-        mailbox and does not change on retry, while `upstream_unavailable` means
-        something the request needed did not answer and is worth retrying. This
-        is the case the error table means by "branch on the status, then within
-        it on the code".
+        `paused` is a decision somebody made about this mailbox and does not
+        change on retry. It shares 409 with `precondition_failed`, so branch on
+        the `code` member: this is the case the error table means by "branch on
+        the status, then within it on the code".
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
-    Unimplemented:
+    Internal:
       description: |
-        This deployment does not serve the operation. A new release is
-        required before it does. Do not retry it.
+        Something went wrong that is not about the request. The credential is
+        fine; do not discard it. Quote `request_id` in a support request.
       content:
         application/json:
           schema:
