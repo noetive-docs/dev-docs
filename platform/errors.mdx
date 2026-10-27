@@ -1,0 +1,52 @@
+---
+title: "Errors across services"
+sidebarTitle: "Errors"
+description: "The refusal codes that come from limits, spend caps, approvals and billing, on every Noetive service."
+---
+
+These codes mean the request was understood and refused by a limit, a rule or billing. They are the same in Semantik, Bud and the Access API. Service-specific codes are in [Semantik errors](/semantik/errors) and [Bud errors](/bud/errors).
+
+Branch on the HTTP status first, then on `code`. Never parse the message.
+
+| Code | Status | Meaning | Retry? |
+|---|---|---|---|
+| `rate_limited` | 429 | A rate limit is spent. `retry_after_ms` says how long to wait | Yes, after `retry_after_ms` |
+| `quota_exceeded` | 429 | A daily quota is spent. `retry_after_ms` says when it refills | Yes, after `retry_after_ms` |
+| `spend_cap_reached` | 402 | The spend cap for the period is reached | No. Raise the cap or wait for the next period |
+| `not_billable` | 402 | The organization has no active subscription or payment method | No. Resolve [billing](/platform/billing) |
+| `approval_required` | 403 | A person must approve this action first. No service returns it at launch | No. Ask an approver, then retry the same request |
+| `policy_unavailable` | 503 | Rules could not be checked, so the request was refused | Yes, with backoff |
+| `impersonation_not_supported` | 403 | See below | No |
+
+## Which limit fired
+
+`rate_limited` and `quota_exceeded` also say which limit fired.
+
+| Field | Meaning |
+|---|---|
+| `retry_after_ms` | How long to wait before retrying |
+| `scope` | Semantik and the Access API. Whose limit it is: organization, tenant or agent |
+| `limit` | Semantik and the Access API. Which limit, such as a per-day quota |
+| `counter` | Bud. Which counter ran out |
+
+```json
+{
+  "code": "rate_limited",
+  "error": "Too many requests.",
+  "retry_after_ms": 1200,
+  "scope": "agent",
+  "limit": "requests_per_second"
+}
+```
+
+## Policy unavailable
+
+When Noetive can't evaluate your rules, it refuses rather than allow an action your rules might forbid. The request had no effect, so retrying is safe.
+
+## Impersonation
+
+Impersonation lets an agent act as a person. You can create impersonation grants in the dashboard, but every service refuses impersonated requests at launch with `impersonation_not_supported`. Don't build on it yet.
+
+## Agent provisioning codes
+
+The calls in [Create agents from your service](/guides/create-agents-from-your-service) add their own codes, such as `agent_limit` and `exceeds_provisioner`. They are listed in the Access API tab.

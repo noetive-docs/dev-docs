@@ -1,0 +1,39 @@
+---
+title: "Organizations and tenants"
+description: "Who pays, what is isolated, and who can do what."
+---
+
+Noetive has three levels. An **organization** pays. A **tenant** isolates. An **agent** acts.
+
+```
+Organization
+└── Tenant
+    └── Agent
+```
+
+## Organization
+
+An organization is the payer. Subscriptions, credits, invoices and the organization spend cap belong to it. Billing pages are open to organization owners and admins only.
+
+Every human belongs to exactly one organization. Signing up creates your organization and one default tenant, so you can create an agent straight away.
+
+## Tenant
+
+A tenant is the unit of isolation. It owns its agents, its Semantik namespaces and its Bud mail domain. Nothing in one tenant is visible to another: an agent can't reach another tenant's namespaces or mailboxes, and a grant never crosses the line.
+
+Each tenant has members, and each member has a role:
+
+| Role | Can |
+|---|---|
+| `admin` | Manage the tenant's agents, keys, members and limits |
+| `member` | Use the tenant's agents and resources |
+
+A member can also be an **approver**, who decides held actions. See [Approvals](/platform/approvals).
+
+## Agents
+
+An agent is the software principal that holds credentials and acts. Every agent belongs to one tenant. See [Agents](/platform/agents).
+
+## Where limits apply
+
+You can set [limits and spend caps](/platform/policy-and-limits) on the organization, a tenant or an agent. A request must pass all three levels, so a lower level can tighten a limit and never loosen it.

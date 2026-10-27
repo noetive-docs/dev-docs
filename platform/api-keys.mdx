@@ -9,6 +9,12 @@ A key acts as an **agent**. The agent decides what the key can reach: which name
 
 Manage both at [Agents](https://www.noetive.io/dashboard/agents).
 
+<Warning>
+  Keys that begin with `keyu_` no longer work. Replace each one with a `keya_` key on an agent, or with a client key. See [Credentials](/platform/credentials).
+</Warning>
+
+A key is one of two credential types. To sign in with a private key instead of a shared secret, see [Credentials](/platform/credentials).
+
 ## Agents
 
 An agent is a bot, a service or an editor that acts on your behalf.
@@ -32,7 +38,7 @@ If a namespace an agent was scoped to is deleted, the agent quietly reaches less
 
 The key reaches its agent's own mailbox in Bud. The agent's mailbox is set up on the key's first request to Bud.
 
-Choose what each agent may use under **Mail and calendar** on its Edit access page: `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
+Choose what each agent may use under **Mail** on its Edit access page: `mail`, `blob` and `approve`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
 
 ## Creating a key
 
@@ -87,6 +93,6 @@ To stop everything an agent can do at once, disable the agent instead. That take
 | Keys per account that are not revoked | 50 |
 | Rotation grace period | 1 hour, 24 hours, 7 days, or none |
 | Semantik namespaces reached | Whatever the key's agent reaches; nothing while unattached |
-| Bud scopes | Chosen per agent from `mail`, `cal`, `book`, `blob`, `approve`, `freebusy` |
+| Bud scopes | Chosen per agent from `mail`, `blob`, `approve` |
 
 Store keys in environment variables or a secrets manager. Do not commit them to source control. [Configuration and secrets](/platform/configuration) covers where the MCP server reads the key and which files can end up holding it.

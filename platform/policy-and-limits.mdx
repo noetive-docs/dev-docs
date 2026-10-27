@@ -1,0 +1,43 @@
+---
+title: "Policy and limits"
+description: "Rate limits, daily quotas, Bud send limits and spend caps, set per organization, tenant or agent."
+---
+
+Limits stop a runaway agent before it costs you. You set them in the dashboard on the organization, a tenant or an agent. Changes take effect within about a minute.
+
+## What you can limit
+
+| Limit | What it caps |
+|---|---|
+| Rates | Requests per second, per service |
+| Daily quotas | Requests, or embedding tokens in Semantik, per day |
+| Bud send limits | Messages an agent's mailbox sends per hour and per day |
+| Spend caps | Estimated spend per billing period |
+| Agent count | How many agents a tenant can hold |
+
+## How levels combine
+
+A request must pass the organization, the tenant and the agent. Where levels disagree, the lowest limit wins. An agent can't raise a limit set above it, and a tenant can't raise one set on the organization.
+
+An agent can read its Bud sending limits with `me.describe` but can't change them.
+
+## Spend caps
+
+A spend cap refuses new billable requests once the estimated spend for the period reaches the cap. You get emails at 50%, 80% and 100%.
+
+<Note>
+  Spend caps are soft. Spend is recomputed continuously, so requests sent in the last couple of minutes before a cap takes effect can still go through. Up to about 2 minutes of overshoot is billed.
+</Note>
+
+## When a limit is reached
+
+The request is refused and says which limit fired:
+
+- `rate_limited` and `quota_exceeded` come with `retry_after_ms` and name the limit that fired, with its `scope` (organization, tenant or agent) in Semantik.
+- `spend_cap_reached` is a 402. Raise the cap or wait for the next period.
+
+See [Errors](/platform/errors). Refused requests are not billed.
+
+## Custom rules
+
+Custom policy rules are coming. Today you set the limits above.

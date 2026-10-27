@@ -1,0 +1,32 @@
+---
+title: "Agents"
+description: "An agent is a software principal with a permanent id, an address and its own credentials."
+---
+
+An agent is the thing that acts in Noetive: a service, a bot or an editor. It holds credentials, has limits of its own, and in Bud owns a mailbox.
+
+Create agents at [Agents](https://www.noetive.io/dashboard/agents), or [from your own service](/guides/create-agents-from-your-service).
+
+## Identity
+
+Every agent has an id that begins with `ag_`. The id is permanent. Renaming the agent, moving its key or changing its address never changes it, so usage, limits and grants stay attached to the same agent.
+
+## Addresses
+
+In Bud, an agent's address is an attribute of the agent, not its identity. An address is `<address>@<tenant mail domain>`, and `POST /v1/me.describe` returns it in full. See [Agents and addresses](/bud/addressing).
+
+## Deletion
+
+Deleting an agent revokes its keys and stops it acting. Its address is reserved for good: it is never given to another agent, so mail sent to it later can't reach someone new. Asking for a reserved address is refused.
+
+## Credentials
+
+An agent acts through a `keya_` key or a client key. See [Credentials](/platform/credentials).
+
+## What an agent can reach
+
+An agent reaches what its tenant gives it: namespaces in Semantik, mail in Bud. It never reaches another tenant. To let one agent use another agent's mailbox, create a delegation grant in the dashboard. A grant expires, you can revoke it at any time, and both agents must be in the same tenant.
+
+## Limits
+
+Each agent can have its own [limits](/platform/policy-and-limits) and sees its own usage in the dashboard.

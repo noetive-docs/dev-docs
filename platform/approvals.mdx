@@ -1,0 +1,30 @@
+---
+title: "Approvals"
+description: "How a person approves an action an agent has asked to take."
+---
+
+An approval puts a person between an agent and an action. The agent asks, the action waits, and someone with the **approver** role decides in the dashboard.
+
+<Note>
+  No Noetive service holds actions for approval at launch, so there is nothing to approve yet. The approver role and the dashboard inbox are in place so you can set them up before the first held action arrives. Custom policy rules, which decide what is held, are coming.
+</Note>
+
+## Who approves
+
+Approvers are tenant members you mark as approvers. By default, the person who owns the agent is its approver. An agent can never approve its own action.
+
+## Deciding
+
+Open **Approvals** in the dashboard, review the request, and approve or reject it. You must be signed in as an approver.
+
+Notification emails link to the dashboard. The link opens the request and never approves or rejects it, so a mail scanner that fetches links can't decide anything.
+
+## What approval covers
+
+An approval authorizes exactly that action, once. If the content changes, the approval no longer applies. If your rules now forbid the action, it is refused even though you approved it.
+
+A request nobody decides expires, after 24 hours by default. An expired or rejected action is not carried out.
+
+## What the agent sees
+
+A call that needs approval is refused with `approval_required`. See [Errors](/platform/errors).
