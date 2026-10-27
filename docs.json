@@ -95,7 +95,7 @@
             "pages": ["guides/quickstart", "guides/mcp-setup"]
           },
           { "group": "Overview", "pages": ["platform/architecture"] },
-          { "group": "Account", "pages": ["platform/api-keys", "platform/provisioning", "platform/configuration"] },
+          { "group": "Account", "pages": ["platform/api-keys", "platform/configuration"] },
           { "group": "Billing", "pages": ["platform/billing", "platform/usage"] }
         ]
       },
@@ -226,22 +226,6 @@
             "group": "Health",
             "pages": [
               "POST /v1/health"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Platform API",
-        "openapi": "api/platform-api.yaml",
-        "groups": [
-          {
-            "group": "Agents and keys",
-            "pages": [
-              "POST /api/v1/agent.create",
-              "POST /api/v1/agent.list",
-              "POST /api/v1/agent.delete",
-              "POST /api/v1/key.rotate",
-              "POST /api/v1/key.revoke"
             ]
           }
         ]

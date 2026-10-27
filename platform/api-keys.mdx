@@ -32,11 +32,7 @@ If a namespace an agent was scoped to is deleted, the agent quietly reaches less
 
 The key reaches its agent's own mailbox in Bud. The agent's mailbox is set up on the key's first request to Bud.
 
-Choose whether each agent may use mail under **Mail** on its Edit access page. The only Bud scope is `mail`, and an agent without it is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
-
-### Letting an agent create agents
-
-Turn on **May create agents and keys** on an agent's Edit access page and its key can create other agents, their keys and their mailboxes through the Platform API. It never grants more than it holds and cannot create more provisioners. See [Create agents from your own service](/platform/provisioning).
+Choose what each agent may use under **Mail and calendar** on its Edit access page: `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. An agent with none of them selected is refused by Bud. Reaching another agent's objects needs a grant, and access never crosses your account.
 
 ## Creating a key
 
@@ -88,10 +84,9 @@ To stop everything an agent can do at once, disable the agent instead. That take
 | Display after creation | Shown once; first characters only thereafter |
 | Keys per agent | One, plus the previous key during a rotation's grace period |
 | Agents per key | One |
-| Agents created through the Platform API | Count against the 50-key limit; one key each |
 | Keys per account that are not revoked | 50 |
 | Rotation grace period | 1 hour, 24 hours, 7 days, or none |
 | Semantik namespaces reached | Whatever the key's agent reaches; nothing while unattached |
-| Bud scopes | The only Bud scope is `mail` |
+| Bud scopes | Chosen per agent from `mail`, `cal`, `book`, `blob`, `approve`, `freebusy` |
 
 Store keys in environment variables or a secrets manager. Do not commit them to source control. [Configuration and secrets](/platform/configuration) covers where the MCP server reads the key and which files can end up holding it.
