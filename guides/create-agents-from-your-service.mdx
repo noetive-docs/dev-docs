@@ -1,0 +1,64 @@
+---
+title: "Create agents from your service"
+sidebarTitle: "Create agents from code"
+description: "Give each customer, ticket or job its own agent, key and mailbox with one API call."
+---
+
+If your service needs an agent per customer, ticket or job, creating each one by hand in the dashboard doesn't scale. An agent can create other agents through `https://access.noetive.io/agents/v1`. The full reference is in the Access API tab.
+
+## Set up the provisioner
+
+<Steps>
+  <Step title="Create the provisioner">
+    Create an agent in the [dashboard](https://www.noetive.io/dashboard/agents) and give it a key. This is the agent your service signs in as.
+  </Step>
+  <Step title="Allow it to create agents">
+    On the agent's access page, turn on **May create agents and keys**. Only a person can turn this on.
+  </Step>
+</Steps>
+
+## Create an agent
+
+Name each agent after your own record of it, such as a ticket id. The name is what makes a retry safe.
+
+```bash
+curl -sS https://access.noetive.io/agents/v1/create \
+  -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ticket 4411 triage","local_part":"triage-4411","bud_scopes":["mail"],"expires_in_days":30}'
+```
+
+The response carries `agent_id`, `address`, `key_id` and `key`. The key is shown once. The call answers only once the agent's mailbox exists.
+
+## Operations
+
+| Operation | Does |
+|---|---|
+| `create` | Creates an agent with a key and a mailbox |
+| `list` | Lists the agents this provisioner created, newest first |
+| `delete` | Deletes an agent and revokes its keys. Its address stays reserved |
+| `rotate_key` | Issues a new key, and stops the old one after a grace period you choose |
+| `revoke_key` | Stops one key. The agent stays |
+
+## What a created agent can do
+
+- **Never more than its creator.** It reaches at most the Bud scopes, namespaces and roles the provisioner holds. This is checked again on `rotate_key`.
+- **No provisioning.** A created agent can't create agents, so a leaked key can't copy itself.
+- **Same tenant.** Everything is created in the provisioner's tenant. No request names a tenant.
+- **Your limits still apply.** The tenant's agent limit and your [limits](/platform/policy-and-limits) apply to every call.
+
+A provisioner sees only the agents it created. Any other agent is answered as `not_found`.
+
+## Retry safely
+
+A refused call leaves no agent and no working key, so you can retry it. If the response is lost after the call succeeded, retry with the same `name`. You get `name_taken` and the `agent_id` that was created. Call `rotate_key` with it to get a working key.
+
+An address stays reserved after its agent is gone. Asking for it again is answered `local_part_taken`; choose another.
+
+## Errors
+
+Branch on the status, then on `code`. `rate_limited` carries `retry_after_ms`, `scope` and `limit`. `mailbox_unavailable`, `policy_unavailable` and `temporarily_unavailable` are worth retrying with backoff. The full list is in the Access API tab, and shared codes are in [Errors](/platform/errors).
+
+<Note>
+  Creating an agent needs an organization that can be billed. Without a payment method, `create` is refused with `not_billable`.
+</Note>

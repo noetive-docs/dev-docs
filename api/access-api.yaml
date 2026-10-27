@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Noetive Access API (agent-facing)
+  version: 0.1.0
+  description: |
+    The agent-facing surface of `access.noetive.io`: what a program holding an
+    agent credential calls.
+
+    This revision documents **`agents/v1`**: create agents, their keys and
+    their mailboxes from your own service, without the dashboard.
+    `approvals/v1` and `access/v1` are served from the same host and are
+    documented in a later revision of this document.
+
+    Every operation is a JSON `POST`, including the ones that only read. Any
+    other method on a known operation is answered `405`, and an operation that
+    does not exist is answered `404` `not_found`.
+
+    ## Who may call it
+
+    The caller is an agent with **May create agents and keys** turned on by a
+    person in the dashboard. That agent is the *provisioner*. It presents one
+    of:
+
+    - a static key (`keya_…`) as `Authorization: Bearer <key>`;
+    - an access token (a JWT) for the audience `https://access.noetive.io`
+      carrying the scope `agent:provision`. The token endpoint grants that
+      scope only to an agent that may create agents; a token without it is
+      answered `403` `insufficient_scope`.
+
+    Everything a provisioner creates belongs to the provisioner's own tenant.
+    No request field names a tenant, so a credential can never create anything
+    in another tenant.
+
+    ## What a provisioner may do
+
+    - **It never grants more than it holds.** An agent it creates reaches at
+      most the Bud scopes, namespaces, global namespaces and roles the
+      provisioner itself holds. This is checked on `create` and again on
+      `rotate_key`.
+    - **It cannot create provisioners.** An agent it creates can never be given
+      this permission, so a leaked credential cannot copy itself.
+    - **It sees only what it created.** Agents made in the dashboard or by
+      another provisioner are answered as `not_found`, exactly like agents that
+      do not exist.
+    - **Policy still applies.** The tenant's agent limit and the organization's
+      and tenant's rules apply to every call.
+
+    ## A refused call leaves no agent and no working key
+
+    `create` answers only once the agent's mailbox exists, and the response
+    carries its address. A call answered with a refusal has removed the agent,
+    and no key from it works, so it is safe to retry. After an
+    `internal_error` or a dropped connection, retry too: the retry either
+    succeeds or answers `name_taken` naming the agent the first attempt made.
+
+    An address stays reserved after its agent is gone, including one from a
+    create interrupted after its mailbox was set up. Asking for it again is
+    answered `local_part_taken` without an `agent_id`; choose another.
+
+    An agent must reach something: at least one Bud scope, a namespace, the
+    shared `global` namespace or a role. A request for an agent reaching
+    nothing is `invalid_request`.
+
+    ## Retrying after a lost response
+
+    Give each agent a `name` derived from your own record of it, such as a
+    ticket or customer id. If a response is lost after the call succeeded, the
+    retry is refused with `name_taken` and the `agent_id` it already created,
+    and because the name is yours that id is the agent you meant. Call
+    `rotate_key` with it to get a working key.
+
+    `revoke_key` of a key that is already revoked answers `not_found`.
+
+    ## Errors
+
+    A refusal is a JSON object with `code` and `error`, at the HTTP status the
+    code maps to. Branch on the status, then within it on the code. `error` is
+    a sentence for a person and may change.
+
+    | code | status | meaning |
+    | --- | --- | --- |
+    | `invalid_request` | 400 | The body is malformed, a field is wrong, or a `before` cursor is not one the API issued. |
+    | `unauthorized` | 401 | No credential, or it is unknown, revoked, expired or its agent is disabled. |
+    | `not_billable` | 402 | The organization cannot create mailboxes until it has a payment method. No agent or key from the call remains. |
+    | `insufficient_scope` | 403 | The token lacks the `agent:provision` scope. |
+    | `not_a_provisioner` | 403 | The agent does not have **May create agents and keys**, or was itself created by an agent. |
+    | `forbidden_by_policy` | 403 | The organization's or tenant's rules forbid this agent from creating agents. |
+    | `exceeds_provisioner` | 403 | The request asks for more than the provisioner itself holds, or, on `rotate_key`, the agent has since been given more than that. |
+    | `not_found` | 404 | No such agent or key among those this provisioner created, or no such operation. |
+    | `method_not_allowed` | 405 | The operation exists but only answers `POST`. |
+    | `agent_limit` | 409 | The tenant holds as many agents as its policy allows. |
+    | `local_part_taken` | 409 | The address is in use. `agent_id` is set when this provisioner created it. |
+    | `name_taken` | 409 | The name is in use. `agent_id` is set when this provisioner created it. |
+    | `conflict` | 409 | Another change to the same agent's key landed first. Retry. |
+    | `rate_limited` | 429 | A limit was reached. `retry_after_ms`, `scope` and `limit` say which and for how long. |
+    | `internal_error` | 500 | Something went wrong that is not about the request. |
+    | `mailbox_unavailable` | 503 | The mailbox could not be set up just now. No agent or key from the call remains; retry after the `Retry-After` header's seconds, with backoff. |
+    | `policy_unavailable` | 503 | Policy could not be evaluated, so the call was refused. Retry with backoff. |
+    | `temporarily_unavailable` | 503 | The credential could not be checked just now. Keep it and retry. |
+servers:
+  - url: https://access.noetive.io
+    description: Noetive Access
+security:
+  - bearerAuth: []
+paths:
+  /agents/v1/create:
+    post:
+      operationId: createAgent
+      summary: Create an agent with a key and a mailbox
+      description: |
+        Creates an agent in the provisioner's tenant, gives it a key, and sets
+        up its mailbox. Answers once the mailbox exists, with its address. The
+        key is shown once and cannot be read back.
+
+        The smallest request is `{"name": "…"}`: an agent with the
+        provisioner's Bud scopes, no namespaces and no roles, a generated
+        address and a key that never expires.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentRequest'
+            example:
+              name: Ticket 4411 triage
+              local_part: triage-4411
+              bud_scopes: [mail]
+              expires_in_days: 30
+      responses:
+        '200':
+          description: The agent, its address and its key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedAgent'
+              example:
+                agent_id: ag_01jb8x4m2fe0bv3c7y1tq9k2rd
+                address: triage-4411@k3x9.noetiveagents.com
+                key_id: key_01jb8x4m3ae0bv3c8m5n7r2wxz
+                key: keya_example
+                expires_at: '2026-11-26T09:00:00Z'
+        '400': {$ref: '#/components/responses/Refusal'}
+        '401': {$ref: '#/components/responses/Refusal'}
+        '402': {$ref: '#/components/responses/Refusal'}
+        '403': {$ref: '#/components/responses/Refusal'}
+        '405': {$ref: '#/components/responses/Refusal'}
+        '409': {$ref: '#/components/responses/Refusal'}
+        '429': {$ref: '#/components/responses/Refusal'}
+        '500': {$ref: '#/components/responses/Refusal'}
+        '503': {$ref: '#/components/responses/Refusal'}
+  /agents/v1/list:
+    post:
+      operationId: listAgents
+      summary: List the agents this provisioner created
+      description: |
+        Every live agent this provisioner created, newest first. An empty
+        `agents` list means it has created none, not that the call failed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListAgentsRequest'
+            example:
+              before: ''
+      responses:
+        '200':
+          description: A page of agents.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPage'
+              example:
+                agents:
+                  - agent_id: ag_01jb8x4m2fe0bv3c7y1tq9k2rd
+                    name: Ticket 4411 triage
+                    address: triage-4411@k3x9.noetiveagents.com
+                    bud_scopes: [mail]
+                    key_id: key_01jb8x4m3ae0bv3c8m5n7r2wxz
+                    disabled: false
+                    created_at: '2026-10-27T09:00:00Z'
+                next_before: ''
+        '400': {$ref: '#/components/responses/Refusal'}
+        '401': {$ref: '#/components/responses/Refusal'}
+        '403': {$ref: '#/components/responses/Refusal'}
+        '405': {$ref: '#/components/responses/Refusal'}
+        '500': {$ref: '#/components/responses/Refusal'}
+        '503': {$ref: '#/components/responses/Refusal'}
+  /agents/v1/delete:
+    post:
+      operationId: deleteAgent
+      summary: Delete an agent
+      description: |
+        Deletes an agent this provisioner created and revokes its keys. Its
+        address stays reserved and is never given to another agent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAgentRequest'
+            example:
+              agent_id: ag_01jb8x4m2fe0bv3c7y1tq9k2rd
+      responses:
+        '200':
+          description: The agent is deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empty'
+        '400': {$ref: '#/components/responses/Refusal'}
+        '401': {$ref: '#/components/responses/Refusal'}
+        '403': {$ref: '#/components/responses/Refusal'}
+        '404': {$ref: '#/components/responses/Refusal'}
+        '405': {$ref: '#/components/responses/Refusal'}
+        '500': {$ref: '#/components/responses/Refusal'}
+        '503': {$ref: '#/components/responses/Refusal'}
+  /agents/v1/rotate_key:
+    post:
+      operationId: rotateKey
+      summary: Issue a fresh key for an agent
+      description: |
+        Gives one of the provisioner's agents a new key, shown once. The key it
+        had stops working when `grace` runs out; `now` stops it in the same
+        step.
+
+        Use it after a lost `create` response, or when a key may have leaked.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RotateKeyRequest'
+            example:
+              agent_id: ag_01jb8x4m2fe0bv3c7y1tq9k2rd
+              grace: now
+              expires_in_days: 30
+      responses:
+        '200':
+          description: The new key, and the agent's address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotatedKey'
+              example:
+                key_id: key_01jb8x7p1ce0bv3d2k4m6q8syv
+                key: keya_example
+                address: triage-4411@k3x9.noetiveagents.com
+                expires_at: '2026-11-26T09:00:00Z'
+                previous_key_valid_until: null
+        '400': {$ref: '#/components/responses/Refusal'}
+        '401': {$ref: '#/components/responses/Refusal'}
+        '403': {$ref: '#/components/responses/Refusal'}
+        '404': {$ref: '#/components/responses/Refusal'}
+        '405': {$ref: '#/components/responses/Refusal'}
+        '409': {$ref: '#/components/responses/Refusal'}
+        '500': {$ref: '#/components/responses/Refusal'}
+        '503': {$ref: '#/components/responses/Refusal'}
+  /agents/v1/revoke_key:
+    post:
+      operationId: revokeKey
+      summary: Revoke a key
+      description: |
+        Stops one key belonging to an agent this provisioner created. The
+        agent stays and can be given a new key with `rotate_key`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeKeyRequest'
+            example:
+              key_id: key_01jb8x4m3ae0bv3c8m5n7r2wxz
+      responses:
+        '200':
+          description: The key is revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Empty'
+        '400': {$ref: '#/components/responses/Refusal'}
+        '401': {$ref: '#/components/responses/Refusal'}
+        '403': {$ref: '#/components/responses/Refusal'}
+        '404': {$ref: '#/components/responses/Refusal'}
+        '405': {$ref: '#/components/responses/Refusal'}
+        '500': {$ref: '#/components/responses/Refusal'}
+        '503': {$ref: '#/components/responses/Refusal'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Either a key (`keya_…`) or an access token (a JWT) for the audience
+        `https://access.noetive.io` carrying the scope `agent:provision`, of an
+        agent with **May create agents and keys**. Pass as
+        `Authorization: Bearer <credential>`.
+  responses:
+    Refusal:
+      description: The request was refused. `code` says why.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Refusal'
+          example:
+            code: local_part_taken
+            error: That address is already in use.
+            agent_id: ag_01jb8x4m2fe0bv3c7y1tq9k2rd
+  schemas:
+    CreateAgentRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Shown in the dashboard. Unique among the owner's agents, ignoring case.
+        local_part:
+          type: string
+          maxLength: 64
+          description: |
+            The part of the address before the `@`: lowercase letters, digits
+            and `.`, `_`, `+`, `-`. Generated when omitted. Fixed once created,
+            because it is in the From of every message the agent sends.
+        bud_scopes:
+          type: array
+          items:
+            type: string
+            enum: [mail]
+          description: |
+            What the agent may do in Bud. Defaults to the provisioner's own
+            when omitted; `[]` means none. Must be among the provisioner's own.
+        namespaces:
+          $ref: '#/components/schemas/NamespaceAccess'
+        roles:
+          type: array
+          maxItems: 16
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+          description: |
+            Tenant roles the agent acts under. Omitted means none; roles are
+            never inherited. Must be among the roles the provisioner holds.
+        expires_in_days:
+          type: integer
+          minimum: 0
+          maximum: 3650
+          description: When the key stops working. `0` or omitted means never.
+    NamespaceAccess:
+      type: object
+      additionalProperties: false
+      required: [scope]
+      description: |
+        Which Semantik namespaces the agent reaches. Omitted means none. Must
+        be within what the provisioner reaches.
+      properties:
+        scope:
+          type: string
+          enum: [all, selected]
+          description: |
+            `all` reaches every namespace in the tenant, present and future,
+            and needs a provisioner whose own scope is `all`. `selected`
+            reaches exactly `ids`.
+        ids:
+          type: array
+          items:
+            type: string
+          description: Namespace ids, under `selected`.
+        include_globals:
+          type: boolean
+          description: Whether the agent also reaches the shared `global` namespace.
+    CreatedAgent:
+      type: object
+      required: [agent_id, address, key_id, key, expires_at]
+      properties:
+        agent_id:
+          type: string
+        address:
+          type: string
+          description: The agent's email address. Empty when it has no Bud scopes, and so no mailbox.
+        key_id:
+          type: string
+          description: The key's id, for `revoke_key`. Not a secret.
+        key:
+          type: string
+          description: The key itself. Shown once.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the key stops working; null when it never does.
+    RotateKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [agent_id]
+      properties:
+        agent_id:
+          type: string
+        grace:
+          type: string
+          enum: [now, 1h, 24h, 7d]
+          description: How long the agent's current key keeps working. Defaults to `now`.
+        expires_in_days:
+          type: integer
+          minimum: 0
+          maximum: 3650
+          description: When the new key stops working. `0` or omitted means never.
+    RotatedKey:
+      type: object
+      required: [key_id, key, address, expires_at, previous_key_valid_until]
+      properties:
+        key_id:
+          type: string
+        key:
+          type: string
+          description: The new key. Shown once.
+        address:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        previous_key_valid_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the replaced key stops; null when it already has.
+    RevokeKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [key_id]
+      properties:
+        key_id:
+          type: string
+    DeleteAgentRequest:
+      type: object
+      additionalProperties: false
+      required: [agent_id]
+      properties:
+        agent_id:
+          type: string
+    ListAgentsRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        before:
+          type: string
+          description: '`next_before` from the previous page; empty for the first.'
+    AgentPage:
+      type: object
+      required: [agents, next_before]
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProvisionedAgent'
+        next_before:
+          type: string
+          description: Pass as `before` for the next page. Empty on the last page.
+    ProvisionedAgent:
+      type: object
+      required: [agent_id, name, address, bud_scopes, key_id, disabled, created_at]
+      properties:
+        agent_id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+          description: Empty when the agent has no mailbox.
+        bud_scopes:
+          type: array
+          items:
+            type: string
+        key_id:
+          type: string
+          description: The key the agent acts through; empty when it has none.
+        disabled:
+          type: boolean
+          description: Disabled in the dashboard. Its keys work again once it is enabled.
+        created_at:
+          type: string
+          format: date-time
+    Empty:
+      type: object
+      additionalProperties: false
+    Refusal:
+      type: object
+      required: [code, error]
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthorized
+            - not_billable
+            - insufficient_scope
+            - not_a_provisioner
+            - forbidden_by_policy
+            - exceeds_provisioner
+            - not_found
+            - method_not_allowed
+            - agent_limit
+            - local_part_taken
+            - name_taken
+            - conflict
+            - rate_limited
+            - internal_error
+            - mailbox_unavailable
+            - policy_unavailable
+            - temporarily_unavailable
+        error:
+          type: string
+          description: A sentence for a person. Do not branch on it.
+        agent_id:
+          type: string
+          description: On `local_part_taken` and `name_taken`, the existing agent when this provisioner created it.
+        retry_after_ms:
+          type: integer
+          description: On `rate_limited`, how long to wait before retrying.
+        scope:
+          type: string
+          description: On `rate_limited`, whose limit it is, such as `tenant`.
+        limit:
+          type: string
+          description: On `rate_limited`, which limit, such as `agent.create` or `concurrent_creates`.

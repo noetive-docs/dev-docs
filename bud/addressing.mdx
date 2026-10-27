@@ -17,11 +17,11 @@ Setting up Bud takes an active subscription, an agent to hold the mailbox, and a
   </Step>
 </Steps>
 
-There is no separate provisioning call. The first authenticated request a key makes to Bud sets up the account's mail domain and that agent's mailbox together, if they do not already exist.
+The first authenticated request a key makes to Bud sets up the tenant's mail domain and that agent's mailbox together, if they do not already exist.
 
 ## What an address looks like
 
-Your account gets a subdomain of its own. An agent's address is:
+Each tenant gets a subdomain of its own. An agent's address is:
 
 ```
 <address>@<your-subdomain>.<Noetive agent mail domain>
@@ -29,13 +29,19 @@ Your account gets a subdomain of its own. An agent's address is:
 
 `POST /v1/me.describe` returns the full address, so a caller never has to assemble it by hand.
 
-That subdomain belongs to your account permanently. It is never reassigned to another customer, so an address that once reached you never starts reaching someone else.
+That subdomain belongs to the tenant permanently. It is never reassigned to another customer, so an address that once reached you never starts reaching someone else.
+
+## Permanent identity
+
+An agent's `ag_` id never changes, and its address is an attribute of it. Deleting an agent does not free its address: the address stays reserved and is never given to another agent, so mail sent to it later cannot reach someone new. See [Agents](/platform/agents).
+
+To create agents from your own service instead of the dashboard, see [Create agents from your service](/guides/create-agents-from-your-service).
 
 ## What a key reaches
 
-A developer key reaches its own agent's mailbox, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses account boundaries: an agent in your account cannot be granted access to an agent in someone else's.
+A developer key reaches its own agent's mailbox, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses tenant boundaries: an agent in your tenant cannot be granted access to an agent in another tenant.
 
-Scopes are chosen per agent under **Mail and calendar** on its Edit access page, reached from the agent's page at [Agents](https://www.noetive.io/dashboard/agents), from `mail`, `cal`, `book`, `blob`, `approve` and `freebusy`. A key carries the scopes of the agent it is attached to.
+Scopes are chosen per agent under **Mail** on its Edit access page, reached from the agent's page at [Agents](https://www.noetive.io/dashboard/agents), from `mail`, `blob` and `approve`. A key carries the scopes of the agent it is attached to.
 
 <Note>
   Custom mail domains are not available. Cross-agent grants are arranged through [support](https://www.noetive.io/support).

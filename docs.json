@@ -92,10 +92,11 @@
         "groups": [
           {
             "group": "Getting started",
-            "pages": ["guides/quickstart", "guides/mcp-setup"]
+            "pages": ["guides/quickstart", "guides/mcp-setup", "guides/create-agents-from-your-service"]
           },
-          { "group": "Overview", "pages": ["platform/architecture"] },
-          { "group": "Account", "pages": ["platform/api-keys", "platform/configuration"] },
+          { "group": "Overview", "pages": ["platform/architecture", "platform/organizations-and-tenants", "platform/agents"] },
+          { "group": "Account", "pages": ["platform/credentials", "platform/api-keys", "platform/configuration"] },
+          { "group": "Controls", "pages": ["platform/policy-and-limits", "platform/approvals", "platform/errors"] },
           { "group": "Billing", "pages": ["platform/billing", "platform/usage"] }
         ]
       },
@@ -226,6 +227,22 @@
             "group": "Health",
             "pages": [
               "POST /v1/health"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Access API",
+        "openapi": "api/access-api.yaml",
+        "groups": [
+          {
+            "group": "Agents and keys",
+            "pages": [
+              "POST /agents/v1/create",
+              "POST /agents/v1/list",
+              "POST /agents/v1/delete",
+              "POST /agents/v1/rotate_key",
+              "POST /agents/v1/revoke_key"
             ]
           }
         ]

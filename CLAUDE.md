@@ -283,6 +283,7 @@ Each API tab is generated from a copy of a spec that lives in the service's own 
 | --- | --- | --- |
 | `api/public-api.yaml` | `public-api.yaml` in `noetive-semantik` | Semantik API |
 | `api/bud-api.yaml` | `public-api.yaml` in `noetive-bud` | Bud API |
+| `api/access-api.yaml` | `public-api.yaml` in `noetive-webapp` | Access API |
 
 Sync is manual: re-copy the file whenever the service ships a contract change. A stale copy produces a silently wrong reference rather than a build failure, so nothing will warn you. Do not edit a copy — fix it upstream and re-copy, otherwise the next sync reverts the edit.
 
