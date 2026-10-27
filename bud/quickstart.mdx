@@ -1,18 +1,18 @@
 ---
 title: "Bud quickstart"
 sidebarTitle: "Quickstart"
-description: "Find your agent's address, add a contact, put an event on its calendar, draft a message and stream what happens."
+description: "Find your agent's address, draft a message and stream what happens."
 ---
 
 This assumes [Getting started](/guides/quickstart): an account, an agent and `NOETIVE_KEY_SECRET` set. Bud is at `https://bud.noetive.io`; every operation is a JSON `POST`.
 
 <Warning>
-  Bud is in preview. Mail is delivered in both directions. A new mailbox sends only to addresses in your account until you ask [support](https://www.noetive.io/support) to turn on outside recipients for it. Custom mail domains aren't available, and the calendar is coming next.
+  Bud is in preview. Mail is delivered in both directions. A new mailbox sends only to addresses in your account until you ask [support](https://www.noetive.io/support) to turn on outside recipients for it. Custom mail domains aren't available.
 </Warning>
 
 <Steps>
   <Step title="Find your agent">
-    The first request also sets up the agent's mailbox, calendar and address book.
+    The first request also sets up the agent's mailbox.
 
     ```bash
     ME=$(curl -sS https://bud.noetive.io/v1/me.describe \
@@ -21,36 +21,9 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
       -d '{}')
 
     MAILBOX=$(echo "$ME" | jq -r '.agent.mailbox')
-    CALENDAR=$(echo "$ME" | jq -r '.agent.calendars[0]')
-    BOOK=$(echo "$ME" | jq -r '.agent.book')
     ```
 
     The response also carries the agent's address and its sending limits.
-  </Step>
-
-  <Step title="Add a contact">
-    ```bash
-    curl -sS https://bud.noetive.io/v1/contact.create \
-      -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
-      -H "Content-Type: application/json" \
-      -d "{\"in\":\"$BOOK\",\"body\":{\"kind\":\"person\",\"fn\":\"Anna Larsson\",\"n\":{\"family\":\"Larsson\",\"given\":\"Anna\"},\"emails\":[{\"addr\":\"anna@example.net\",\"type\":\"work\",\"pref\":true}],\"org\":\"Example AB\",\"title\":\"CTO\"}}"
-    ```
-
-    The response carries `ref` and `version`.
-  </Step>
-
-  <Step title="Put an event on the calendar">
-    ```bash
-    START=$(date -u -v+7d '+%Y-%m-%dT09:00:00Z' 2>/dev/null || date -u -d '+7 days' '+%Y-%m-%dT09:00:00Z')
-    END=$(date -u -v+7d '+%Y-%m-%dT09:30:00Z' 2>/dev/null || date -u -d '+7 days' '+%Y-%m-%dT09:30:00Z')
-
-    curl -sS https://bud.noetive.io/v1/event.create \
-      -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
-      -H "Content-Type: application/json" \
-      -d "{\"in\":\"$CALENDAR\",\"body\":{\"summary\":\"Quarterly review\",\"location\":\"Room 1\",\"start\":\"$START\",\"end\":\"$END\",\"tz\":\"Europe/Stockholm\"}}"
-    ```
-
-    No attendees on this event: an event with attendees is refused.
   </Step>
 
   <Step title="Draft a message">
@@ -77,7 +50,7 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
       -d "{\"mailbox\":\"$MAILBOX\",\"timeout_s\":25}"
     ```
 
-    This opens a Server-Sent Events stream of mail events for that mailbox. Calendar and contact changes are not on this stream.
+    This opens a Server-Sent Events stream of mail events for that mailbox.
   </Step>
 </Steps>
 
@@ -85,9 +58,7 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
 
 | Operation | Did |
 |---|---|
-| `me.describe` | Found the agent's address, mailbox, calendar and address book |
-| `contact.create` | Added a contact to the address book |
-| `event.create` | Put an event on the calendar |
+| `me.describe` | Found the agent's address, mailbox and sending limits |
 | `draft.create` | Drafted a message |
 | `folder.list` | Listed messages in a folder |
 | `watch` | Streamed mail events for the mailbox |

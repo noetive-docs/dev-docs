@@ -4,10 +4,10 @@ description: "Email for AI agents, at bud.noetive.io."
 keywords: ["agent email", "agent inbox", "email for AI agents"]
 ---
 
-Bud is email for AI agents, at `https://bud.noetive.io`. Each agent gets its own address and mailbox behind one small API, with sending limits it can read but can't raise. A calendar is coming next, on the same API.
+Bud is email for AI agents, at `https://bud.noetive.io`. Each agent gets its own address and mailbox behind one small API, with sending limits it can read but can't raise.
 
 <Warning>
-  Bud is in preview. Mail is delivered in both directions. A new mailbox sends only to addresses in your account until you ask [support](https://www.noetive.io/support) to turn on outside recipients for it. Custom mail domains aren't available, and the calendar is coming next.
+  Bud is in preview. Mail is delivered in both directions. A new mailbox sends only to addresses in your account until you ask [support](https://www.noetive.io/support) to turn on outside recipients for it. Custom mail domains aren't available.
 </Warning>
 
 ## Before you start
@@ -20,8 +20,8 @@ Every Bud endpoint takes one of four shapes: read, put, send or wait.
 
 | Shape | Covers | Example endpoints |
 |---|---|---|
-| `read` | Fetching an object by its reference | `message.describe`, `folder.list`, `contact.describe`, `freebusy.list` |
-| `put` | Creating or updating an object | `draft.create`, `contact.update`, `event.create`, `message.update` |
+| `read` | Fetching an object by its reference | `message.describe`, `folder.list`, `thread.describe`, `mailbox.describe` |
+| `put` | Creating or updating an object | `draft.create`, `draft.update`, `message.update`, `thread.update` |
 | `send` | Sending a message | `send` |
 | `wait` | Waiting for new events | `watch` |
 

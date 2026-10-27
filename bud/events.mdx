@@ -3,7 +3,7 @@ title: "Events"
 description: "Stream mail events as they happen with POST /v1/watch."
 ---
 
-`POST /v1/watch` opens a Server-Sent Events stream of mail events for the mailboxes your key can read: mail arriving, a send leaving, a hold waiting on somebody, a delivery outcome for a message you sent. Calendar and contact changes are not on this stream.
+`POST /v1/watch` opens a Server-Sent Events stream of mail events for the mailboxes your key can read: mail arriving, a send leaving, a hold waiting on somebody, a delivery outcome for a message you sent.
 
 Opening a stream counts as one request, however long you keep it open.
 
@@ -64,7 +64,7 @@ An error that happens after `open` is a failure in flight: it arrives as a `batc
 
 ## Scope
 
-The stream reports mail events for the mailboxes your key can read, and needs the `mail` scope. Calendar and contact changes are not reported.
+The stream reports mail events for the mailboxes your key can read, and needs the `mail` scope.
 
 Delivery to a webhook endpoint instead of a stream is arranged through [support](https://www.noetive.io/support); `watch` itself is self-service.
 
