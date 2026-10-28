@@ -17,6 +17,7 @@ Branch on the HTTP status first, then on `code`. Never parse the message.
 | `approval_required` | 403 | A person must approve this action first. No service returns it at launch | No. Ask an approver, then retry the same request |
 | `policy_unavailable` | 503 | Rules could not be checked, so the request was refused | Yes, with backoff |
 | `impersonation_not_supported` | 403 | See below | No |
+| `insufficient_scope` | 403 | The access token was issued without the scope this operation needs | No. Request a token with that scope |
 
 ## Which limit fired
 
