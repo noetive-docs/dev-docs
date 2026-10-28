@@ -139,6 +139,7 @@
             "group": "Endpoints",
             "pages": [
               "POST /v1/publish",
+              "POST /v1/search",
               "POST /v1/subscribe",
               "POST /v1/lint",
               "POST /v1/health"

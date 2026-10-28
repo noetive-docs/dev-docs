@@ -135,20 +135,25 @@ info:
     | `idempotency_key_conflict` | the `idempotency_key` is live from an earlier publish carrying different content; nothing was stored |
     | `unsupported_media_type` | `Content-Type` is not `application/json` |
     | `request_too_large` | request body exceeds the endpoint size limit |
-    | `rate_limited` | per-client burst or rate limit exhausted |
+    | `rate_limited` | a request-rate limit is exhausted, either the per-client burst limit or a rate limit on your agent or tenant; `retry_after_ms` is set, and when a rate limit on your plan fired the body also names its `scope` and `limit` |
+    | `quota_exceeded` | a usage quota (requests or embedding tokens per day) on your agent or tenant is used up; `retry_after_ms` says when the window next refills, and the body names the `scope` and `limit` that fired |
     | `too_many_requests` | concurrency limit exhausted, or a subscription cap is reached: per namespace, per caller, or node-wide; `retry_after_ms` is set |
     | `unavailable` | service temporarily unavailable; retry after `retry_after_ms` |
     | `namespace_unavailable` | namespace lookup is transiently unavailable; retry after `retry_after_ms` |
     | `namespace_disabled` | the namespace alias exists but has been administratively disabled |
-    | `namespace_out_of_scope` | the namespace alias exists on your account, but the API key you presented belongs to an agent that may not reach it; use a key whose agent covers it, or widen that agent's scope |
+    | `namespace_out_of_scope` | the namespace alias exists in your tenant, but the credential you presented belongs to an agent that may not reach it; use a credential whose agent covers it, or widen that agent's scope |
     | `model_not_provisioned` | the namespace alias exists but has no entry for the requested (model, dimensions) combination |
     | `not_billable` | no active subscription on the account; resolve billing before retrying |
+    | `spend_cap_reached` | the spend cap set for your organization, tenant or agent is reached; raise the cap or wait for the next period before retrying |
+    | `policy_unavailable` | the policy that governs this credential could not be determined right now; retry after `retry_after_ms` |
+    | `impersonation_not_supported` | the token acts on behalf of a user, which this service does not accept yet; use the agent's own credential |
+    | `insufficient_scope` | the access token is valid but its scope does not include this operation (`semantik:publish`, `semantik:search` or `semantik:subscribe`); request a token with the scope, or widen the agent's ceiling. API keys carry no scope and are never refused for it |
     | `metering_unavailable` | metered billing is transiently unavailable; retry with backoff |
     | `internal_error` | unexpected server error — quote `request_id` when contacting support |
   contact:
     name: Noetive Support
     url: https://noetive.io
-    email: support@noetive.io
+    email: support@noetive.eu
   license:
     name: Noetive Commercial
     url: https://noetive.io/terms
@@ -235,7 +240,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Missing or invalid API key bearer token. `error` is `unauthorized`.
+          description: Missing, invalid, expired or revoked bearer credential. `error` is `unauthorized`.
           content:
             application/json:
               schema:
@@ -243,8 +248,10 @@ paths:
         '402':
           description: |
             Request is authenticated but billing blocks the call. `error` is
-            `not_billable`: the account has no active subscription.
-            Retrying will keep failing until billing is resolved.
+            `not_billable`: the account has no active subscription, or
+            `spend_cap_reached`: a spend cap on your organization, tenant or
+            agent is reached. Retrying will keep failing until billing is
+            resolved or the cap is raised or its period rolls over.
           content:
             application/json:
               schema:
@@ -254,10 +261,12 @@ paths:
             The namespace cannot be used by this caller. `error` is either
             `namespace_disabled` — the alias resolves but has been turned off,
             and retries do not help until it is re-enabled — or
-            `namespace_out_of_scope`, meaning the alias exists on the account but
-            the presented key belongs to an agent that may not reach it. The
+            `namespace_out_of_scope`, meaning the alias exists in the tenant but
+            the presented credential belongs to an agent that may not reach it. The
             second is not a transient condition either: use a key whose agent
-            covers the namespace, or widen that agent's scope.
+            covers the namespace, or widen that agent's scope. A token that acts on behalf of a user is refused with
+            `impersonation_not_supported`, and an access token whose scope does
+            not include subscribing with `insufficient_scope`.
           content:
             application/json:
               schema:
@@ -283,7 +292,7 @@ paths:
         '429':
           description: |
             Rate limited or too many concurrent requests.
-            Error codes: `rate_limited` or `too_many_requests`.
+            Error codes: `rate_limited`, `quota_exceeded` or `too_many_requests`.
             `retry_after_ms` is set; clients should back off.
           content:
             application/json:
@@ -298,6 +307,10 @@ paths:
         '503':
           description: |
             Service is temporarily unavailable. `error` is one of:
+
+            - `policy_unavailable` — the policy for this credential could not
+              be determined right now. Nothing was done; retry after
+              `retry_after_ms`.
 
             - `unavailable` — the service or one of its dependencies is
               transiently unavailable. Retry after `retry_after_ms`.
@@ -383,7 +396,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Missing or invalid API key bearer token. `error` is `unauthorized`.
+          description: Missing, invalid, expired or revoked bearer credential. `error` is `unauthorized`.
           content:
             application/json:
               schema:
@@ -391,7 +404,9 @@ paths:
         '402':
           description: |
             Request is authenticated but billing blocks the call. `error` is
-            `not_billable`: the account has no active subscription.
+            `not_billable`: the account has no active subscription, or
+            `spend_cap_reached`: a spend cap on your organization, tenant or
+            agent is reached.
             Retrying will keep failing until billing is resolved.
           content:
             application/json:
@@ -399,9 +414,13 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            Namespace is administratively disabled. `error` is
-            `namespace_disabled` or `namespace_out_of_scope`. Retries do not help until the namespace
-            is re-enabled.
+            The call cannot be made with this credential. `error` is
+            `namespace_disabled` or `namespace_out_of_scope` (retries do not
+            help until the namespace is re-enabled or the agent's scope is
+            widened), `impersonation_not_supported` (the token acts on
+            behalf of a user; use the agent's own credential), or
+            `insufficient_scope` (the access token's scope does not include
+            this operation; request a token that does).
           content:
             application/json:
               schema:
@@ -434,7 +453,7 @@ paths:
         '429':
           description: |
             Service is overloaded or applying backpressure. `error` is one
-            of `rate_limited`, `too_many_requests`, or `backpressure`.
+            of `rate_limited`, `quota_exceeded`, `too_many_requests`, or `backpressure`.
             `retry_after_ms` is set; clients should back off.
           content:
             application/json:
@@ -449,6 +468,10 @@ paths:
         '503':
           description: |
             Service is temporarily unavailable. `error` is one of:
+
+            - `policy_unavailable` — the policy for this credential could not
+              be determined right now. Nothing was done; retry after
+              `retry_after_ms`.
 
             - `unavailable` — the service is shedding load or a dependency
               is transiently unavailable. `retry_after_ms` is set and the
@@ -526,7 +549,7 @@ paths:
         '429':
           description: |
             Rate limited or too many concurrent requests.
-            Error codes: `rate_limited` or `too_many_requests`.
+            Error codes: `rate_limited`, `quota_exceeded` or `too_many_requests`.
           content:
             application/json:
               schema:
@@ -552,6 +575,16 @@ paths:
         `MatchEvent` JSON object. The subscription is removed automatically
         when the client disconnects.
 
+        A subscriber that reads more slowly than its matches arrive is not
+        allowed to hold up publishers. Matches it could not take are counted
+        and reported soon after in a `missed` event carrying a `MissedEvent`.
+        While the stream is open, every match is either delivered or counted
+        in a `missed` event. Matches still on their way when the stream ends,
+        whichever side closes it, are neither delivered nor counted. The
+        promise is per stream: in a group, a message won by a member whose
+        stream has just closed is lost (see `group`). Search the namespace
+        with the same query to recover what was missed.
+
         Example SSE frames:
 
         ```
@@ -560,6 +593,9 @@ paths:
 
         event: match
         data: {"message_id":"msg_7a21de40f1b2c493","seq":150,"score":0.82}
+
+        event: missed
+        data: {"count":3}
         ```
 
         With `include_vector: true`, each `match` frame also carries the
@@ -608,13 +644,15 @@ paths:
 
             - First event: `event: subscribed`, data is a `SubscribedEvent`.
             - Subsequent events: `event: match`, data is a `MatchEvent`.
+            - `event: missed`, data is a `MissedEvent`: matches this stream
+              could not deliver because the subscriber fell behind.
           content:
             text/event-stream:
               schema:
                 type: string
                 description: |
                   Raw SSE stream. Payload schemas for each event type are
-                  `SubscribedEvent` and `MatchEvent`.
+                  `SubscribedEvent`, `MatchEvent` and `MissedEvent`.
         '400':
           description: |
             Invalid request. `error` is one of:
@@ -641,7 +679,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Missing or invalid API key bearer token. `error` is `unauthorized`.
+          description: Missing, invalid, expired or revoked bearer credential. `error` is `unauthorized`.
           content:
             application/json:
               schema:
@@ -649,7 +687,9 @@ paths:
         '402':
           description: |
             Request is authenticated but billing blocks the call. `error` is
-            `not_billable`: the account has no active subscription.
+            `not_billable`: the account has no active subscription, or
+            `spend_cap_reached`: a spend cap on your organization, tenant or
+            agent is reached.
             Retrying will keep failing until billing is resolved.
           content:
             application/json:
@@ -657,9 +697,13 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: |
-            Namespace is administratively disabled. `error` is
-            `namespace_disabled` or `namespace_out_of_scope`. Retries do not help until the namespace
-            is re-enabled.
+            The call cannot be made with this credential. `error` is
+            `namespace_disabled` or `namespace_out_of_scope` (retries do not
+            help until the namespace is re-enabled or the agent's scope is
+            widened), `impersonation_not_supported` (the token acts on
+            behalf of a user; use the agent's own credential), or
+            `insufficient_scope` (the access token's scope does not include
+            this operation; request a token that does).
           content:
             application/json:
               schema:
@@ -679,7 +723,7 @@ paths:
         '429':
           description: |
             Rate limited or too many concurrent subscriptions.
-            Error codes: `rate_limited` or `too_many_requests`.
+            Error codes: `rate_limited`, `quota_exceeded` or `too_many_requests`.
             `retry_after_ms` is set; clients should back off.
           content:
             application/json:
@@ -694,6 +738,10 @@ paths:
         '503':
           description: |
             Service is temporarily unavailable. `error` is one of:
+
+            - `policy_unavailable` — the policy for this credential could not
+              be determined right now. Nothing was done; retry after
+              `retry_after_ms`.
 
             - `unavailable` — subscription setup exceeded its budget or a
               service dependency is transiently unavailable.
@@ -729,8 +777,14 @@ components:
       type: http
       scheme: bearer
       description: |
-        API key bearer token. Obtain from the Noetive dashboard.
-        Pass as: `Authorization: Bearer <api-key>`.
+        Either an agent API key (`keya_…`, from the Noetive dashboard) or a
+        short-lived access token for an agent. Pass as:
+        `Authorization: Bearer <credential>`. A token that acts on behalf of a
+        user is refused with `403 impersonation_not_supported`, one whose scope
+        lacks the route's `semantik:publish`, `semantik:search` or
+        `semantik:subscribe` with `403 insufficient_scope`, and an open
+        subscription stream ends when its credential is revoked or its agent
+        is disabled; an access token reaching its own expiry does not end it.
 
   schemas:
     SearchRequest:
@@ -1233,9 +1287,9 @@ components:
             them, such as agent roles, so that each message has one owner
             instead of reaching every role it is loosely related to.
 
-            - A group belongs to the account that opened it. Every API key
-              on your account shares your group names, so any of your keys
-              can join a group; subscriptions opened by another account
+            - A group belongs to the tenant that opened it. Every agent
+              and API key in your tenant shares its group names, so any of
+              them can join a group; subscriptions opened by another tenant
               never compete with yours, whatever group name they use.
             - Only open streams compete. Once Semantik sees that the member
               that would have won a message has closed its stream, the
@@ -1245,9 +1299,10 @@ components:
               closer one unless they tie.
             - A member's `seq` values have gaps for messages another member
               won, so in a group a gap does not by itself mean a lost
-              message. Messages are still dropped when the winning member's
-              stream is not being read fast enough, as for any
-              subscription; they are not passed to the next member.
+              message. When the winning member's stream is not being read
+              fast enough, that member misses the message and its stream
+              reports it in a `missed` event, as for any subscription; it
+              is not passed to the next member.
             - Members are compared by `score`, so they must match on the
               same clause kinds (`DISTANCE`, `DIRECTION`, `CONTRAST`,
               ignoring clauses under `NOT`): a `CONTRAST` member scores
@@ -1319,6 +1374,25 @@ components:
             `include_vector: true`; absent otherwise. See
             `SubscribeRequest.include_vector`.
 
+    MissedEvent:
+      type: object
+      description: |
+        Payload of a `missed` SSE frame on `/v1/subscribe`. Sent when the
+        subscriber read more slowly than matches arrived and some could not
+        be delivered. The stream stays open and later matches keep arriving.
+        No missed match is counted twice.
+      required:
+        - count
+      properties:
+        count:
+          type: integer
+          format: uint64
+          minimum: 1
+          description: |
+            How many matches were not delivered since the previous `missed`
+            frame. The frame does not say which messages they were; search
+            the namespace with the subscription's query to recover them.
+
     ErrorResponse:
       type: object
       required:
@@ -1343,6 +1417,20 @@ components:
           format: uint32
           description: |
             Hint for how long to wait before retrying. Present on
-            `backpressure`, `unavailable`, `namespace_unavailable`, and
+            `backpressure`, `rate_limited`, `quota_exceeded`, `unavailable`,
+            `namespace_unavailable`, `policy_unavailable` and
             `metering_unavailable` errors; absent (or `0`) means do not
             retry.
+        scope:
+          type: string
+          enum: [agent, tenant, organization]
+          description: |
+            On `rate_limited` and `quota_exceeded` from a plan limit: whose
+            allowance ran out, so the caller knows whether waiting or
+            changing agent helps.
+        limit:
+          type: string
+          description: |
+            On `rate_limited` and `quota_exceeded` from a plan limit: the
+            name of the limit that fired, such as `requests`,
+            `requests_per_day` or `embed_tokens_per_day`.
