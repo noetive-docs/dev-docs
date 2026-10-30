@@ -23,7 +23,7 @@ An agent can read its Bud sending limits with `me.describe` but can't change the
 
 ## Spend caps
 
-A spend cap refuses new billable requests once the estimated spend for the period reaches the cap. You get emails at 50%, 80% and 100%.
+A spend cap has a mode that decides what happens when the estimated spend for the period reaches it. **Notify only**, the default, warns and refuses nothing. **Refuse billable work** refuses new billable requests from then until the cap is raised or the period ends. Either way, emails go out at 50%, 80% and 100%: to the organization's billing contact for an organization cap, and to the tenant's admins for a tenant or agent cap.
 
 <Note>
   Spend caps are soft. Spend is recomputed continuously, so requests sent in the last couple of minutes before a cap takes effect can still go through. Up to about 2 minutes of overshoot is billed.

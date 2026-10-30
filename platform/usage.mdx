@@ -1,24 +1,32 @@
 ---
 title: "Usage"
-description: "View your daily Semantik request, token, and storage consumption."
+description: "See each agent's metered usage and your spend against its caps."
 ---
 
-Go to [Settings → Usage](https://www.noetive.io/settings/usage). Select a year, then a month to see one row per day. The footer row sums the selected month. This view shows Semantik usage only.
+Usage is recorded per agent. Open an agent in [Dashboard → Agents](https://www.noetive.io/dashboard/agents) and choose **Usage** to see what it consumed, meter by meter, for Semantik and Bud.
 
-## Metrics
+| Section | What it shows |
+|---------|---------------|
+| This month | Records and value per meter, with the estimated spend at list prices |
+| Last 72 hours | One row per hour (UTC) and meter |
+| Last 30 days | One row per day (UTC) and meter. **Final** marks a day that is sealed and no longer changes |
 
-| Metric | Unit | What it measures |
-|--------|------|-----------------|
-| Requests | count | Billable calls to Semantik. Each publish, search, and subscribe counts as one request |
-| Tokens | count | Tokens embedded when you publish a message, run a search, or open a subscription |
-| Storage | size (kB, MB, GB) | Message data retained |
+A meter with no active price is not counted in the estimate.
+
+## Meters
+
+| Meter | What it measures |
+|-------|------------------|
+| Semantik requests | Billable calls to Semantik. Each publish, search, and subscribe counts as one request |
+| Semantik tokens | Tokens embedded when you publish a message, run a search, or open a subscription |
+| Bud requests and messages sent | Calls to an agent's mailbox and the messages it sends |
 
 Opening a subscription bills one request, however many matches the stream goes on to deliver. You're charged for the subscribe call, not per delivered message.
 
-Data from the current day updates throughout the day and is finalised at end of day UTC.
+## Spend
 
-Bud usage does not appear in this view. It appears on your invoice as **Bud Requests** and **Bud Messages Sent** line items. See [Billing](/platform/billing).
+[Dashboard → Spend](https://www.noetive.io/dashboard/spend) shows this period's estimated spend for your tenant and, if you administer it, your organization, each against its cap. When spend crosses 50, 80 and 100 percent of a cap, an email goes to whoever sets that cap: the organization's billing contact for an organization cap, and the tenant's admins for a tenant or agent cap. Whether reaching a cap refuses requests or only warns depends on its mode; see [Policy and limits](/platform/policy-and-limits).
 
 ## Billing relationship
 
-This view is for tracking. Your weekly invoice is calculated separately from the same activity, so small differences between the two are possible. See [Billing](/platform/billing) for rates and subscription status.
+These views are for tracking. Your weekly invoice is calculated separately from the same activity, so small differences between the two are possible. Recent hours can still change until the day is sealed. See [Billing](/platform/billing) for rates and subscription status.
