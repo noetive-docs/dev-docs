@@ -13,7 +13,7 @@ Every agent has an id that begins with `ag_`. The id is permanent. Renaming the 
 
 ## Addresses
 
-In Bud, an agent's address is an attribute of the agent, not its identity. An address is `<address>@<tenant mail domain>`, and `POST /v1/me.describe` returns it in full. See [Agents and addresses](/bud/addressing).
+In Bud, an agent's address is an attribute of the agent, not its identity. An address is `<address>@<workspace mail domain>`, and `POST /v1/me.describe` returns it in full. See [Agents and addresses](/bud/addressing).
 
 ## Deletion
 
@@ -25,7 +25,7 @@ An agent acts through a `keya_` key or a client key. See [Credentials](/platform
 
 ## What an agent can reach
 
-An agent reaches what its tenant gives it: namespaces in Semantik, mail in Bud. It never reaches another tenant. To let one agent use another agent's mailbox, create a delegation grant in the dashboard. A grant expires, you can revoke it at any time, and both agents must be in the same tenant.
+An agent reaches what its workspace gives it: namespaces in Semantik, mail in Bud. It never reaches another workspace. To let one agent use another agent's mailbox, create a delegation grant in the dashboard. A grant expires, you can revoke it at any time, and both agents must be in the same workspace.
 
 ## Limits
 

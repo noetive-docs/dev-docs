@@ -44,8 +44,8 @@ The response carries `agent_id`, `address`, `key_id` and `key`. The key is shown
 
 - **Never more than its creator.** It reaches at most the Bud scopes, namespaces and roles the provisioner holds. This is checked again on `rotate_key`.
 - **No provisioning.** A created agent can't create agents, so a leaked key can't copy itself.
-- **Same tenant.** Everything is created in the provisioner's tenant. No request names a tenant.
-- **Your limits still apply.** The tenant's agent limit and your [limits](/platform/policy-and-limits) apply to every call.
+- **Same workspace.** Everything is created in the provisioner's workspace. No request names a workspace.
+- **Your limits still apply.** The workspace's agent limit and your [limits](/platform/policy-and-limits) apply to every call.
 
 A provisioner sees only the agents it created. Any other agent is answered as `not_found`.
 

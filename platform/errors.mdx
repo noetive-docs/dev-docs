@@ -14,7 +14,7 @@ Branch on the HTTP status first, then on `code`. Never parse the message.
 | `quota_exceeded` | 429 | A daily quota is spent. `retry_after_ms` says when it refills | Yes, after `retry_after_ms` |
 | `spend_cap_reached` | 402 | The spend cap for the period is reached | No. Raise the cap or wait for the next period |
 | `not_billable` | 402 | The organization has no active subscription or payment method | No. Resolve [billing](/platform/billing) |
-| `approval_required` | 403 | A person must approve this action first. No service returns it at launch | No. Ask an approver, then retry the same request |
+| `approval_required` | 403 | A person must approve this action first, and the operation cannot wait for one. Bud returns it on reads; a Bud send is never refused with it and comes back `held` instead | No. Ask an approver, then retry the same request |
 | `policy_unavailable` | 503 | Rules could not be checked, so the request was refused | Yes, with backoff |
 | `impersonation_not_supported` | 403 | See below | No |
 | `insufficient_scope` | 403 | The access token was issued without the scope this operation needs | No. Request a token with that scope |
@@ -26,7 +26,7 @@ Branch on the HTTP status first, then on `code`. Never parse the message.
 | Field | Meaning |
 |---|---|
 | `retry_after_ms` | How long to wait before retrying |
-| `scope` | Semantik and the Access API. Whose limit it is: organization, tenant or agent |
+| `scope` | Semantik and the Access API. Whose limit it is: `organization`, `tenant` (the workspace) or `agent` |
 | `limit` | Semantik and the Access API. Which limit, such as a per-day quota |
 | `counter` | Bud. Which counter ran out |
 

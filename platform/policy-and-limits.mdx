@@ -1,9 +1,9 @@
 ---
 title: "Policy and limits"
-description: "Rate limits, daily quotas, Bud send limits and spend caps, set per organization, tenant or agent."
+description: "Rate limits, daily quotas, Bud send limits and spend caps, set per organization, workspace or agent."
 ---
 
-Limits stop a runaway agent before it costs you. You set them in the dashboard on the organization, a tenant or an agent. Changes take effect within about a minute.
+Limits stop a runaway agent before it costs you. You set them in the dashboard on the organization, a workspace or an agent. Changes take effect within about a minute.
 
 ## What you can limit
 
@@ -13,17 +13,17 @@ Limits stop a runaway agent before it costs you. You set them in the dashboard o
 | Daily quotas | Requests, or embedding tokens in Semantik, per day |
 | Bud send limits | Messages an agent's mailbox sends per hour and per day |
 | Spend caps | Estimated spend per billing period |
-| Agent count | How many agents a tenant can hold |
+| Agent count | How many agents a workspace can hold |
 
 ## How levels combine
 
-A request must pass the organization, the tenant and the agent. Where levels disagree, the lowest limit wins. An agent can't raise a limit set above it, and a tenant can't raise one set on the organization.
+A request must pass the organization, the workspace and the agent. Where levels disagree, the lowest limit wins. An agent can't raise a limit set above it, and a workspace can't raise one set on the organization.
 
 An agent can read its Bud sending limits with `me.describe` but can't change them.
 
 ## Spend caps
 
-A spend cap has a mode that decides what happens when the estimated spend for the period reaches it. **Notify only**, the default, warns and refuses nothing. **Refuse billable work** refuses new billable requests from then until the cap is raised or the period ends. Either way, emails go out at 50%, 80% and 100%: to the organization's billing contact for an organization cap, and to the tenant's admins for a tenant or agent cap.
+A spend cap has a mode that decides what happens when the estimated spend for the period reaches it. **Notify only**, the default, warns and refuses nothing. **Refuse billable work** refuses new billable requests from then until the cap is raised or the period ends. Either way, emails go out at 50%, 80% and 100%: to the organization's billing contact for an organization cap, and to the workspace's admins for a workspace or agent cap.
 
 <Note>
   Spend caps are soft. Spend is recomputed continuously, so requests sent in the last couple of minutes before a cap takes effect can still go through. Up to about 2 minutes of overshoot is billed.
@@ -33,13 +33,13 @@ A spend cap has a mode that decides what happens when the estimated spend for th
 
 The request is refused and says which limit fired:
 
-- `rate_limited` and `quota_exceeded` come with `retry_after_ms` and name the limit that fired, with its `scope` (organization, tenant or agent) in Semantik.
+- `rate_limited` and `quota_exceeded` come with `retry_after_ms` and name the limit that fired, with its `scope` (`organization`, `tenant` for the workspace, or `agent`) in Semantik.
 - `spend_cap_reached` is a 402. Raise the cap or wait for the next period.
 
 See [Errors](/platform/errors). Refused requests are not billed.
 
 ## Custom rules
 
-Beyond the limits above, you can write rules in [Cedar](https://www.cedarpolicy.com) on the agent, tenant and organization policy pages. A rule allows an action, forbids it, or marks it as needing a person's [approval](/platform/approvals). An organization rule can only narrow what is allowed, and a tenant rule can only narrow or define roles, so a lower level never overturns a forbid above it. A rule that cannot be evaluated counts as a forbid.
+Beyond the limits above, you can write rules in [Cedar](https://www.cedarpolicy.com) on the agent, workspace and organization policy pages. A rule allows an action, forbids it, or marks it as needing a person's [approval](/platform/approvals). An organization rule can only narrow what is allowed, and a workspace rule can only narrow or define roles, so a lower level never overturns a forbid above it. A rule that cannot be evaluated counts as a forbid.
 
 Rules apply to Bud mail today. A Bud send under rules it cannot check is refused with `policy_unavailable` rather than sent unchecked.

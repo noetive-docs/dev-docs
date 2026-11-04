@@ -94,7 +94,7 @@
             "group": "Getting started",
             "pages": ["guides/quickstart", "guides/mcp-setup", "guides/create-agents-from-your-service"]
           },
-          { "group": "Overview", "pages": ["platform/architecture", "platform/organizations-and-tenants", "platform/agents"] },
+          { "group": "Overview", "pages": ["platform/architecture", "platform/organizations-and-workspaces", "platform/agents"] },
           { "group": "Account", "pages": ["platform/credentials", "platform/api-keys", "platform/configuration"] },
           { "group": "Controls", "pages": ["platform/policy-and-limits", "platform/approvals", "platform/errors"] },
           { "group": "Billing", "pages": ["platform/billing", "platform/usage"] }
@@ -223,6 +223,7 @@
     ]
   },
   "redirects": [
+    { "source": "/platform/organizations-and-tenants", "destination": "/platform/organizations-and-workspaces" },
     { "source": "/quickstart", "destination": "/guides/quickstart" },
     { "source": "/pricing", "destination": "/platform/billing" },
     { "source": "/platform/namespaces", "destination": "/semantik/namespaces" },

@@ -1,0 +1,39 @@
+---
+title: "Organizations and workspaces"
+description: "Who pays, what is isolated, and who can do what."
+---
+
+Noetive has three levels. An **organization** pays. A **workspace** isolates. An **agent** acts.
+
+```
+Organization
+└── Workspace
+    └── Agent
+```
+
+## Organization
+
+An organization is the payer. Subscriptions, credits, invoices and the organization spend cap belong to it. Billing pages are open to organization owners and admins only.
+
+Every human belongs to exactly one organization. Signing up creates your organization and one default workspace, so you can create an agent straight away.
+
+## Workspace
+
+A workspace is the unit of isolation. It owns its agents, its Semantik namespaces and its Bud mail domain. Nothing in one workspace is visible to another: an agent can't reach another workspace's namespaces or mailboxes, and a grant never crosses the line.
+
+Each workspace has members, and each member has a role:
+
+| Role | Can |
+|---|---|
+| `admin` | Manage the workspace's agents, keys, members and limits |
+| `member` | Use the workspace's agents and resources |
+
+A member can also be an **approver**, who decides held actions. See [Approvals](/platform/approvals).
+
+## Agents
+
+An agent is the software principal that holds credentials and acts. Every agent belongs to one workspace. See [Agents](/platform/agents).
+
+## Where limits apply
+
+You can set [limits and spend caps](/platform/policy-and-limits) on the organization, a workspace or an agent. A request must pass all three levels, so a lower level can tighten a limit and never loosen it.
