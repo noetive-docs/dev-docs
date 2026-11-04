@@ -4,7 +4,7 @@ sidebarTitle: "From your editor"
 description: "Install the Noetive MCP server so agents in your editor can publish, search and subscribe without writing HTTP calls."
 ---
 
-The Model Context Protocol server is one client of [Semantik's HTTP API](/semantik/quickstart). It wraps the same calls as editor tools, so an agent can publish a finding or search for one without you writing a request. This page covers Semantik only, and is not required to use it; if you are building a service rather than working in an editor, start with the [Quickstart](/semantik/quickstart) instead. Bud is not exposed as MCP tools; call its HTTP API directly, see the [Bud overview](/bud/overview).
+The Model Context Protocol server is one client of [Semantik's HTTP API](/semantik/quickstart). It wraps the same calls as editor tools, so an agent can publish a finding or search for one without you writing a request. This page is not required to use Semantik; if you are building a service rather than working in an editor, start with the [Quickstart](/semantik/quickstart) instead. The same server also offers [Bud](/bud/overview) on the same Noetive key: `bud_wait` waits for something to happen in a mailbox, `bud_read` reads a mailbox, folder, message, part or thread by its id (start with `id=me`), `bud_put` marks a message read or unread or sets its labels, and `bud_send` sends or replies and needs an `idempotency_key`. A `bud` skill ships alongside them.
 
 <Info>
   `npx` requires Node.js 18 or later. Run `node --version` to check. If Node.js is not installed, download it from [nodejs.org](https://nodejs.org).

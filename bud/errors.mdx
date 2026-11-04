@@ -23,7 +23,7 @@ Every refusal is a JSON object with an `error` member, at the HTTP status the co
 | `hint` | What to do about it, when there is a concrete next step |
 | `field` | A JSON pointer to the offending field, on `invalid` |
 | `request_id` | Correlates this refusal with everything the request caused, also on the `X-Request-Id` header |
-| `retry_after_ms` | How long to wait before retrying, on `rate_limited` |
+| `retry_after_ms` | How long to wait before retrying, on `rate_limited`, and when the quota refills, on `quota_exceeded` |
 | `version` | The version to retry with, on `precondition_failed` |
 
 ## Which errors to retry
@@ -33,19 +33,24 @@ Every refusal is a JSON object with an `error` member, at the HTTP status the co
 | `invalid` | 400 | The request is malformed or a field is wrong. `field` is a JSON pointer to it | No. Fix the request |
 | `unauthorized` | 401 | The credential is missing, unknown, revoked or expired | No. Stop presenting the key |
 | `not_billable` | 402 | The credential is good and the account behind it cannot incur usage | No. Resolve billing first |
+| `spend_cap_reached` | 402 | A spend cap on the organization, workspace or agent has been reached. The payment method is not the problem | No. A person raises the cap, or its period ends |
 | `forbidden_scope` | 403 | The credential is valid and does not reach this object, or does not reach an agent on this service at all | No. The key is fine; its reach is not |
+| `impersonation_not_supported` | 403 | The access token acts for a person, and no operation accepts that yet | No. Use a credential for the agent itself |
+| `approval_required` | 403 | A person has to approve this action before it can happen, and this operation cannot wait for one. A send never gets this; it comes back `held` | No. A person must approve |
 | `not_found` | 404 | No such object, or no such operation | No. Check the reference |
 | `precondition_failed` | 409 | Someone else wrote first, or a version was needed and not sent. `version` is the value to retry with | Yes. Read the object again, then retry against what is stored now |
 | `policy_refused` | 422 | A policy declined. The message says which | No. Change the request |
 | `rate_limited` | 429 | A limit is spent. `retry_after_ms` says how long to wait | Yes, after `retry_after_ms` |
-| `paused` | 503 | The mailbox is paused and is not sending | No. This is a decision about the mailbox, not a transient failure |
+| `quota_exceeded` | 429 | A usage quota for the period is used up. `retry_after_ms` says when the quota refills | Not in a loop. Waiting a second does not help; wait until `retry_after_ms` |
+| `paused` | 409 | The mailbox is paused and is not sending | No. This is a decision about the mailbox, not a transient failure |
 | `upstream_unavailable` | 503 | Something this request needed did not answer | Yes, with backoff |
-| `unavailable` | 501 | This deployment does not implement the operation | No. Only a new deployment adds it |
+| `policy_unavailable` | 503 | The policy that governs this caller could not be applied, so nothing was done | Yes, with backoff |
+| `unavailable` | 404 | This deployment does not serve this option of the operation | No. Only a new deployment adds it |
 | `internal` | 500 | Something went wrong that is not about the request | No. Quote `request_id` to support |
 
-`paused` and `upstream_unavailable` can share a status on the same operation. The `code` member is what tells them apart, so branch on the status first and on the code within it.
+Several codes share a status: `paused` and `precondition_failed` are both 409, `unavailable` and `not_found` are both 404, and `rate_limited` and `quota_exceeded` are both 429. The `code` member is what tells them apart, so branch on the code, not the status.
 
-`unavailable` is 501 rather than 500 so that a retry policy written against statuses does not retry it.
+`unavailable` is a 404 rather than a 5xx so that a retry policy written against statuses does not retry it.
 
 ## Only 401 means the key is the problem
 
@@ -55,7 +60,7 @@ Treat 401 as "this key doesn't work": stop presenting it. `forbidden_scope`, `no
 
 `WWW-Authenticate` is sent with 401 and with no other status, so its presence is a reliable test for "the credential is the problem" if that's easier to branch on than the status code.
 
-`upstream_unavailable` is the one worth retrying. It is transient by definition, and the request had no effect.
+`upstream_unavailable` and `policy_unavailable` are the ones worth retrying. They are transient by definition, and the request had no effect.
 
 ## Limits
 

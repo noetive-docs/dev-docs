@@ -7,6 +7,24 @@ description: "Stream mail events as they happen with POST /v1/watch."
 
 Opening a stream counts as one request, however long you keep it open.
 
+The bearer credential can be an API key or an access token.
+
+## Event types
+
+| Type | Meaning |
+|---|---|
+| `mail.received`, `mail.quarantined` | Mail arrived, the second filed in quarantine |
+| `mail.queued` | A send was accepted |
+| `mail.held` | A send is waiting for a person to approve it |
+| `mail.approved` | A person released a held send |
+| `mail.rejected` | A person refused a held send, or the wait lapsed. The sending budget is given back |
+| `mail.sent`, `mail.delivered` | A send left, and the receiving side accepted it |
+| `mail.bounced`, `mail.complained` | A send was refused for good, or reported as unwanted |
+| `mail.read` | A message was marked read or unread |
+| `render.failed` | A rendering was withheld as unsafe and a degraded one shown instead |
+
+A held send is never released by sending it again. Wait for `mail.approved` or `mail.rejected`.
+
 ## Request
 
 ```json

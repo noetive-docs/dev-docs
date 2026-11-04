@@ -17,11 +17,11 @@ Setting up Bud takes an active subscription, an agent to hold the mailbox, and a
   </Step>
 </Steps>
 
-The first authenticated request a key makes to Bud sets up the tenant's mail domain and that agent's mailbox together, if they do not already exist.
+The first authenticated request a key makes to Bud sets up the workspace's mail domain and that agent's mailbox together, if they do not already exist.
 
 ## What an address looks like
 
-Each tenant gets a subdomain of its own. An agent's address is:
+Each workspace gets a subdomain of its own. An agent's address is:
 
 ```
 <address>@<your-subdomain>.<Noetive agent mail domain>
@@ -29,7 +29,7 @@ Each tenant gets a subdomain of its own. An agent's address is:
 
 `POST /v1/me.describe` returns the full address, so a caller never has to assemble it by hand.
 
-That subdomain belongs to the tenant permanently. It is never reassigned to another customer, so an address that once reached you never starts reaching someone else.
+That subdomain belongs to the workspace permanently. It is never reassigned to another customer, so an address that once reached you never starts reaching someone else.
 
 ## Permanent identity
 
@@ -39,7 +39,7 @@ To create agents from your own service instead of the dashboard, see [Create age
 
 ## What a key reaches
 
-A developer key reaches its own agent's mailbox, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses tenant boundaries: an agent in your tenant cannot be granted access to an agent in another tenant.
+A developer key reaches its own agent's mailbox, nothing more by default. Reaching another agent's objects needs a grant, and a grant never crosses workspace boundaries: an agent in your workspace cannot be granted access to an agent in another workspace.
 
 Scopes are chosen per agent under **Mail** on its Edit access page, reached from the agent's page at [Agents](https://www.noetive.io/dashboard/agents), from `mail`, `blob` and `approve`. A key carries the scopes of the agent it is attached to.
 

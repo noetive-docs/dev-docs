@@ -3,10 +3,11 @@ title: "Agent skills"
 description: "Bundled skills that teach an agent when to reach for Semantik and how to write SemQL."
 ---
 
-Skills are instruction files an agent loads for a task. The Noetive MCP installer bundles three, all of them covering Semantik. Bud is not exposed as MCP tools; call its HTTP API directly. See the [Bud overview](/bud/overview).
+Skills are instruction files an agent loads for a task. The Noetive MCP installer bundles four: three cover Semantik and one covers Bud. The same server offers Bud as tools on the same Noetive key; see the [Bud overview](/bud/overview).
 
 | Skill | What it teaches |
 |---|---|
+| `bud` | How to read a mailbox, wait for mail and send or reply |
 | `semantik` | What Semantik is and which capability fits a given problem |
 | `semql` | How to write and debug SemQL queries |
 | `doctor` | How to diagnose a broken install or a failing call |
