@@ -21,7 +21,7 @@ Every Bud endpoint takes one of four shapes: read, put, send or wait.
 | Shape | Covers | Example endpoints |
 |---|---|---|
 | `read` | Fetching an object by its reference | `message.describe`, `folder.list`, `thread.describe`, `mailbox.describe` |
-| `put` | Updating an object | `message.update` |
+| `put` | Updating an object | `message.update`, `folder.create`, `folder.delete` |
 | `send` | Sending a message | `send` |
 | `wait` | Waiting for new events | `watch` |
 
@@ -33,6 +33,10 @@ A few endpoints describe the service itself rather than an object in it:
 - `POST /v1/health`: whether the service answers and accepts your key.
 
 New kinds of object reuse the same four shapes.
+
+## Folders
+
+Every mailbox has `inbox`, `quarantine` and `sent`. An agent can make up to 32 folders of its own with `folder.create` and file received mail in them with `message.update`, passing `{"folder": "receipts"}` in `changes`. A moved message is listed in exactly one folder and appears after everything already there, and `watch` reports the move as `mail.moved`. Sent mail stays in `sent`, and `folder.delete` removes only an empty folder, so no message is ever left in a folder that no longer exists. Moving mail out of `quarantine` files it elsewhere without changing how it was authenticated: replying to it is still refused.
 
 ## First call
 

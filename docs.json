@@ -156,13 +156,16 @@
             "pages": [
               "POST /v1/me.describe",
               "POST /v1/help.describe",
-              "POST /v1/catalog.describe"
+              "POST /v1/catalog.describe",
+              "POST /v1/addressbook.describe"
             ]
           },
           {
             "group": "Mail",
             "pages": [
               "POST /v1/folder.list",
+              "POST /v1/folder.create",
+              "POST /v1/folder.delete",
               "POST /v1/message.describe",
               "POST /v1/message.update",
               "POST /v1/thread.describe",

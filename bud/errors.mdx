@@ -38,7 +38,7 @@ Every refusal is a JSON object with an `error` member, at the HTTP status the co
 | `impersonation_not_supported` | 403 | The access token acts for a person, and no operation accepts that yet | No. Use a credential for the agent itself |
 | `approval_required` | 403 | A person has to approve this action before it can happen, and this operation cannot wait for one. A send never gets this; it comes back `held` | No. A person must approve |
 | `not_found` | 404 | No such object, or no such operation | No. Check the reference |
-| `precondition_failed` | 409 | Someone else wrote first, or a version was needed and not sent. `version` is the value to retry with | Yes. Read the object again, then retry against what is stored now |
+| `precondition_failed` | 409 | Someone else wrote first, a version was needed and not sent, or the object is not in a state the write applies to: a message still being delivered, a folder that still holds mail, or a mailbox with all the folders it may have. The hint says which, and `version` is the value to retry with when there is one | Yes. Read the object again, then retry against what is stored now |
 | `policy_refused` | 422 | A policy declined. The message says which | No. Change the request |
 | `rate_limited` | 429 | A limit is spent. `retry_after_ms` says how long to wait | Yes, after `retry_after_ms` |
 | `quota_exceeded` | 429 | A usage quota for the period is used up. `retry_after_ms` says when the quota refills | Not in a loop. Waiting a second does not help; wait until `retry_after_ms` |

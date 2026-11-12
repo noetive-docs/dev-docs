@@ -60,7 +60,7 @@ info:
     | `impersonation_not_supported` | 403 | The token acts for a person, and no operation accepts that yet. |
     | `approval_required` | 403 | A person has to approve this action before it can happen, and this operation cannot wait for one (a read). A send is never refused with this: it comes back `held`. |
     | `not_found` | 404 | No such object, an object this credential does not reach, or no such operation. |
-    | `precondition_failed` | 409 | Another write to the same object kept landing first. Read it again and retry. |
+    | `precondition_failed` | 409 | The object is not in a state this write applies to: another write kept landing first, a message is still arriving, a folder still holds mail, or a mailbox has all the folders it may. The hint says which. |
     | `policy_refused` | 422 | A policy declined. `guard` names which. |
     | `rate_limited` | 429 | A limit is spent. `counter` names which, and `retry_after_ms` says how long to wait when waiting helps. |
     | `quota_exceeded` | 429 | A usage quota for the period is used up. Waiting a second does not help; `counter` names which and `retry_after_ms` says when the window refills. |
@@ -169,7 +169,10 @@ paths:
       summary: List a folder
       description: |
         Messages in one folder of one mailbox, oldest first, in the order they
-        were filed. `folder` is `inbox` (the default), `sent` or `quarantine`.
+        were filed. `folder` is `inbox` (the default), `sent`, `quarantine`, or
+        a folder the mailbox made with folder.create. A folder the mailbox does
+        not have is a `404`, never an empty listing. A message moved into a
+        folder is filed after everything already there.
 
         Use `cursor` to page. A listing is stable: a message that arrives
         mid-page is filed after everything you have already seen, so it
@@ -192,6 +195,68 @@ paths:
         '402': { $ref: '#/components/responses/NotBillable' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  /v1/folder.create:
+    post:
+      operationId: createFolder
+      tags: [Mail]
+      summary: Make a folder
+      description: |
+        Make a folder in a mailbox to file mail in with message.update. Making
+        one that already exists changes nothing and reports no effect, so the
+        call is safe to repeat. A mailbox has at most 32 folders of its own;
+        past that the call is a `409` until one is removed. `inbox`,
+        `quarantine` and `sent` always exist and cannot be made.
+
+        Only the mailbox's own agent can make or remove its folders.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FolderWriteRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Write' }
+        '400': { $ref: '#/components/responses/Invalid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  /v1/folder.delete:
+    post:
+      operationId: deleteFolder
+      tags: [Mail]
+      summary: Remove a folder
+      description: |
+        Remove a folder the mailbox made. Only an empty folder is removed: one
+        that still holds mail is a `409`, and nothing changes until its mail is
+        moved elsewhere, so no message is ever left in a folder that no longer
+        exists. Removing one that is already gone reports no effect.
+        A message moved into the folder at the moment it is removed goes to
+        `inbox` instead, journalled as a `mail.moved` whose actor is the
+        server.        `inbox`, `quarantine` and `sent` cannot be removed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FolderWriteRequest'
+      responses:
+        '200': { $ref: '#/components/responses/Write' }
+        '400': { $ref: '#/components/responses/Invalid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
@@ -230,11 +295,25 @@ paths:
     post:
       operationId: updateMessage
       tags: [Mail]
-      summary: Mark or label a message
+      summary: Mark, label or move a message
       description: |
-        Mark a message read, or replace its labels. `effects` in the result
-        says what changed.
+        Mark a message read, replace its labels, or move it to another folder
+        of its mailbox. `effects` in the result says what changed; a change
+        that was already true reports nothing.
 
+        A move takes received mail between `inbox`, `quarantine` and the
+        folders made with folder.create. Sent mail stays in `sent`. Moving a
+        message out of `quarantine` files it elsewhere and does not change how
+        it was authenticated: the provenance it is shown with is the same, and
+        replying to it is refused as before.
+
+        The changes in one request apply in order — read, then labels, then
+        folder — and are not one transaction: a refused move leaves a read or
+        label change from the same request applied. A move is journalled as
+        `mail.moved` once it is complete, which may be just after this
+        response. If the request fails after the move was recorded, repeating
+        it finishes the move and its event, and reports no effect because
+        the message is already where it was asked to go.
         A `409` means other label writes kept landing first. A `read` change in
         the same request may already have been applied; the request is safe to
         repeat as it is.
@@ -289,8 +368,9 @@ paths:
       tags: [Mail]
       summary: Describe a mailbox
       description: |
-        Its addresses (the first is the default), its folders, its limits,
-        and what it is currently allowed to send.
+        Its addresses (the first is the default), its folders with how many
+        messages each holds — the folders it made included, empty or not —
+        its limits, and what it is currently allowed to send.
         `sending` carries the same status as me.describe.
       requestBody:
         required: true
@@ -517,6 +597,37 @@ paths:
           application/json:
             schema:
               type: object
+      responses:
+        '200': { $ref: '#/components/responses/Read' }
+        '400': { $ref: '#/components/responses/Invalid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/NotBillable' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  /v1/addressbook.describe:
+    post:
+      operationId: describeAddressbook
+      tags: [Discovery]
+      summary: The workspace addressbook
+      description: |
+        Every agent in your workspace that has a mailbox, and the addresses
+        that reach it, so an agent can write to a colleague by name. Built from the workspace's own
+        agents on every call: nothing a sender writes can add an entry, and a
+        disabled or deleted agent is not listed. Your own entry is marked
+        `self`. Needs the `book` scope.
+
+        `addresses` send and receive, the first being the one the agent sends
+        from; `receive_only` addresses deliver to the agent and are never sent
+        from.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressbookRequest'
       responses:
         '200': { $ref: '#/components/responses/Read' }
         '400': { $ref: '#/components/responses/Invalid' }
@@ -760,9 +871,7 @@ components:
           description: The mailbox, by its agent's identifier.
           example: ag_01j9x2v8k3e0080000000000
         folder:
-          type: string
-          enum: [inbox, sent, quarantine]
-          description: Which folder. Default `inbox`.
+          $ref: '#/components/schemas/FolderName'
         unread:
           type: boolean
           description: |
@@ -802,6 +911,19 @@ components:
             page of the same operation returned; cursors are opaque, and one
             operation's cursor means nothing to another.
 
+    AddressbookRequest:
+      type: object
+      properties:
+        q:
+          type: string
+          description: Only agents whose name or an address contains this text, ignoring case.
+        limit:
+          type: integer
+          description: How many agents to return. Default 50, at most 200.
+        cursor:
+          type: string
+          description: Resume a listing, from the `cursor` the last page returned.
+
     CorrespondentListRequest:
       type: object
       required: [in]
@@ -822,6 +944,28 @@ components:
         cursor:
           type: string
           description: Resume a listing, from the `cursor` the last page returned.
+
+    FolderName:
+      type: string
+      pattern: '^[a-z0-9][a-z0-9-]{0,47}$'
+      description: |
+        `inbox`, `quarantine`, `sent`, or a folder the mailbox made: lowercase
+        letters, digits and hyphens, at most 48 characters, not `corr` or
+        `unread`.
+      example: receipts
+
+    FolderWriteRequest:
+      type: object
+      required: [in, folder]
+      properties:
+        in:
+          type: string
+          description: The mailbox, by its agent's identifier.
+          example: ag_01j9x2v8k3e0080000000000
+        folder:
+          $ref: '#/components/schemas/FolderName'
+        idempotency_key:
+          type: string
 
     UpdateRequest:
       type: object
@@ -844,6 +988,8 @@ components:
               description: |
                 The message's labels, whole. Replaces what is there, so an
                 empty list removes them all.
+            folder:
+              $ref: '#/components/schemas/FolderName'
         idempotency_key:
           type: string
 
@@ -1006,6 +1152,7 @@ components:
         - mail.bounced
         - mail.complained
         - mail.read
+        - mail.moved
         - render.failed
       description: |
         `mail.received` and `mail.quarantined` are mail arriving, the second
@@ -1014,7 +1161,11 @@ components:
         follow a send: accepted, held for a person, released by a person,
         refused or lapsed while held (the budget is given back), handed to the
         provider, accepted by the receiving side, refused for good, reported as
-        unwanted. `mail.read` is a message marked read or unread.
+        unwanted. `mail.read` is a message marked read or unread. `mail.moved`
+        is a message filed in another folder; its `folder` is where it went,
+        while the folder on `mail.received` is where it arrived. Its actor is
+        the agent that moved it, or the server when a removed folder sent the
+        message back to `inbox`.
         `render.failed` means a rendering was withheld as unsafe and a
         degraded one shown instead.
 
@@ -1127,7 +1278,7 @@ components:
             properties:
               kind:
                 type: string
-                enum: [mail.read, labelled]
+                enum: [mail.read, labelled, moved, folder.created, folder.deleted]
               count:
                 type: integer
               ref:
@@ -1370,8 +1521,11 @@ components:
             $ref: '#/components/schemas/ErrorEnvelope'
     Conflict:
       description: |
-        Other writes to the same object kept landing first. Read it again and
-        retry, so the retry is decided against what is stored now.
+        The object is not in a state this write applies to: other writes kept
+        landing first, a message is still being delivered, a folder still
+        holds mail, or a mailbox has as many folders as it may. The hint says
+        which. Read it again and retry, so the retry is decided against what
+        is stored now.
       content:
         application/json:
           schema:
