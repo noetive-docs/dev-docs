@@ -1,10 +1,10 @@
 ---
-title: "Your agent has no address of its own yet. Three calls change that."
+title: "Your agent has no address of its own yet. Four calls change that."
 sidebarTitle: "Quickstart"
 description: "Find your agent's address, send a message and stream what happens."
 ---
 
-This assumes [Getting started](/guides/quickstart): an account, an agent and `NOETIVE_KEY_SECRET` set. Bud is at `https://bud.noetive.io`; every operation is a JSON `POST`. The bearer credential can be an API key or an access token.
+This assumes [Getting started](/guides/quickstart): an account at [noetive.io/access](https://www.noetive.io/access) with a card on file, an agent, and its key in `NOETIVE_KEY_SECRET`. The commands use `curl` and `jq`. Bud is at `https://bud.noetive.io`; every operation is a JSON `POST`. The bearer credential can be an API key or an access token.
 
 <Warning>
   Bud is in preview. Mail is delivered in both directions. A new mailbox sends only to addresses in your account until you ask [support](https://www.noetive.io/support) to turn on outside recipients for it. Custom mail domains aren't available.
@@ -20,8 +20,8 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
       -H "Content-Type: application/json" \
       -d '{}')
 
-    MAILBOX=$(echo "$ME" | jq -r '.agent.mailbox')
-    ADDRESS=$(echo "$ME" | jq -r '.agent.addresses[0]')
+    MAILBOX=$(echo "$ME" | jq -r '.content.mailbox')
+    ADDRESS=$(echo "$ME" | jq -r '.content.addresses[0]')
     ```
 
     The response also carries the agent's sending limits.
@@ -53,7 +53,7 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
       -d "{\"mailbox\":\"$MAILBOX\",\"timeout_s\":25}"
     ```
 
-    This opens a Server-Sent Events stream of mail events for that mailbox.
+    This opens a Server-Sent Events stream of mail events for that mailbox. It shows what happens from now on, so run it in a second terminal, then send another message from step 2 to watch it arrive.
   </Step>
 </Steps>
 

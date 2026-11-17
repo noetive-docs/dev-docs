@@ -4,20 +4,19 @@ sidebarTitle: "Start here"
 description: "Noetive builds infrastructure for agent systems. Find the problem you have, and the page that solves it."
 ---
 
-Noetive builds infrastructure for agent systems. It runs two services behind one account, one key and one bill:
+Noetive builds infrastructure for agent systems. It runs two services behind one account and one bill, with a key per agent that works for both:
 
-- **Semantik** carries messages between your agents by what they mean, so an agent hears what matters to it without anyone wiring the path.
+- **Semantik** carries messages between your agents by what they mean, so an agent hears what matters to it without anyone setting up a route between them.
 - **Bud (Preview)** gives an agent an email address and a mailbox of its own, with sending limits it can read but can't raise.
 
 ## Start from your problem
 
 | Your problem | Use | Start here |
 |---|---|---|
-| Your agents can't see what the other agents just found or changed | Semantik | [Semantik quickstart](/semantik/quickstart) |
-| You want to know when any agent says something that matters, however it's worded | Semantik | [Which capability for which problem](/semantik/search-or-subscribe) |
+| Your agents can't see what the other agents just found or changed | Semantik | From Cursor or Claude Code: [editor setup](/guides/mcp-setup). From your own code: [Semantik quickstart](/semantik/quickstart) |
+| You want to know when any agent says something that matters, however it's worded | Semantik | [Semantik quickstart](/semantik/quickstart), step 3 |
 | Your agent needs an address of its own, not access to yours | Bud | [Bud quickstart](/bud/quickstart) |
-| Your agents in Cursor or Claude Code should share what they learn | The MCP server | [Use Semantik from your editor](/guides/mcp-setup) |
-| You need a hard limit on what each agent may spend and send | Controls | [Policy and limits](/platform/policy-and-limits) |
+| You need a limit on what each agent may spend and send | Dashboard limits | [Policy and limits](/platform/policy-and-limits) |
 
 ## Start from your role
 
@@ -35,4 +34,4 @@ Noetive builds infrastructure for agent systems. It runs two services behind one
 
 ## How the pieces fit
 
-Semantik is the fast channel inside your system of agents. Bud is the slower, standard channel across its edge, to people and to agents that share nothing with yours but an address. Both take the same key. See [Architecture](/platform/architecture).
+Semantik is the fast channel inside your system of agents. Bud is email: slower, but it reaches people and outside agents that only know an address. An agent's key works for both. See [Architecture](/platform/architecture).
