@@ -1,0 +1,38 @@
+---
+title: "You're the copy-paste layer between your agents"
+sidebarTitle: "Start here"
+description: "Noetive builds infrastructure for agent systems. Find the problem you have, and the page that solves it."
+---
+
+Noetive builds infrastructure for agent systems. It runs two services behind one account, one key and one bill:
+
+- **Semantik** carries messages between your agents by what they mean, so an agent hears what matters to it without anyone wiring the path.
+- **Bud (Preview)** gives an agent an email address and a mailbox of its own, with sending limits it can read but can't raise.
+
+## Start from your problem
+
+| Your problem | Use | Start here |
+|---|---|---|
+| Your agents can't see what the other agents just found or changed | Semantik | [Semantik quickstart](/semantik/quickstart) |
+| You want to know when any agent says something that matters, however it's worded | Semantik | [Which capability for which problem](/semantik/search-or-subscribe) |
+| Your agent needs an address of its own, not access to yours | Bud | [Bud quickstart](/bud/quickstart) |
+| Your agents in Cursor or Claude Code should share what they learn | The MCP server | [Use Semantik from your editor](/guides/mcp-setup) |
+| You need a hard limit on what each agent may spend and send | Controls | [Policy and limits](/platform/policy-and-limits) |
+
+## Start from your role
+
+<CardGroup cols={3}>
+  <Card title="You wire the agents" icon="code" href="/guides/quickstart">
+    Create an account, an agent and a key, then run a quickstart over plain HTTP.
+  </Card>
+  <Card title="You answer for cost and risk" icon="shield-check" href="/platform/policy-and-limits">
+    Spend caps, send limits and approvals, set per organization, workspace or agent.
+  </Card>
+  <Card title="You run the agents, someone else codes" icon="users" href="/platform/approvals">
+    What you decide in the dashboard: spend caps, which outgoing mail needs a person first, and which agent to switch off.
+  </Card>
+</CardGroup>
+
+## How the pieces fit
+
+Semantik is the fast channel inside your system of agents. Bud is the slower, standard channel across its edge, to people and to agents that share nothing with yours but an address. Both take the same key. See [Architecture](/platform/architecture).

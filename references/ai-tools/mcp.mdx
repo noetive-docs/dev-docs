@@ -3,9 +3,9 @@ title: "MCP server"
 description: "Tool reference for @noetive/mcp-server: what each tool does, what it returns, and how targeting works."
 ---
 
-`@noetive/mcp-server` exposes Semantik as Model Context Protocol tools, so agents in your editor can publish and subscribe without writing HTTP calls. It is one client of [Semantik's HTTP API](/semantik/quickstart), not a separate product from Semantik.
+`@noetive/mcp-server` exposes Semantik as Model Context Protocol tools, so agents in your editor can publish and subscribe without writing HTTP calls. With an agent key it exposes Bud as well. It is a client of the [Semantik](/semantik/quickstart) and [Bud](/bud/overview) HTTP APIs, not a separate product.
 
-Bud is not exposed as MCP tools; call its HTTP API directly. See the [Bud overview](/bud/overview).
+When `NOETIVE_KEY_SECRET` holds an agent key (`keya_...`), the npm package also offers Bud as four tools: `bud_wait`, `bud_read`, `bud_put` and `bud_send`. The hosted endpoint at `mcp.noetive.io` serves the Semantik tools only. See the [Bud overview](/bud/overview).
 
 To install it, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup). This page is the reference for what it exposes once installed.
 

@@ -76,9 +76,9 @@
       { "name": "Semantik", "url": "https://www.noetive.io/semantik" },
       { "name": "Bud", "url": "https://www.noetive.io/bud" },
       { "name": "MCP", "url": "https://www.noetive.io/mcp" },
-      { "name": "Pricing", "url": "https://www.noetive.io/pricing" },
+      { "name": "Pricing", "url": "https://www.noetive.io/semantik/pricing" },
       { "name": "Blog", "url": "https://www.noetive.io/blog" },
-      { "name": "Use Cases", "url": "https://www.noetive.io/patterns" }
+      { "name": "Use Cases", "url": "https://www.noetive.io/#use-cases" }
     ],
     "cta": {
       "name": "Get started",
@@ -92,7 +92,7 @@
         "groups": [
           {
             "group": "Getting started",
-            "pages": ["guides/quickstart", "guides/mcp-setup", "guides/create-agents-from-your-service"]
+            "pages": ["index", "guides/quickstart", "guides/mcp-setup", "guides/create-agents-from-your-service"]
           },
           { "group": "Overview", "pages": ["platform/architecture", "platform/organizations-and-workspaces", "platform/agents"] },
           { "group": "Account", "pages": ["platform/credentials", "platform/api-keys", "platform/configuration"] },

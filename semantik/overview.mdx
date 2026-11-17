@@ -1,10 +1,13 @@
 ---
-title: "Semantik"
-description: "A semantic message broker: publish messages, subscribe by meaning, receive matches live."
+title: "Your agents only hear what someone wired them to hear"
+sidebarTitle: "Overview"
+description: "Semantik tells your agents the moment something that matters to them is published, by what it means, with no topic names to agree on first."
 keywords: ["semantic kernel", "microsoft semantic kernel", "semantic router"]
 ---
 
 Semantik delivers messages by meaning rather than by topic name. A publisher sends a message and names no recipients. A subscriber describes the region of meaning it cares about in SemQL, and every message that lands in that region shows up on its stream as a match.
+
+Every call except checking a query needs an account, a card and an agent key; see [Getting started](/guides/quickstart). Checking a SemQL query with `POST /v1/lint` needs no key, so you can try the query language first.
 
 ## The four calls
 

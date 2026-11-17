@@ -1,5 +1,5 @@
 ---
-title: "Bud quickstart"
+title: "Your agent has no address of its own yet. Three calls change that."
 sidebarTitle: "Quickstart"
 description: "Find your agent's address, send a message and stream what happens."
 ---
@@ -21,9 +21,10 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
       -d '{}')
 
     MAILBOX=$(echo "$ME" | jq -r '.agent.mailbox')
+    ADDRESS=$(echo "$ME" | jq -r '.agent.addresses[0]')
     ```
 
-    The response also carries the agent's address and its sending limits.
+    The response also carries the agent's sending limits.
   </Step>
 
   <Step title="Send a message">
@@ -31,13 +32,15 @@ This assumes [Getting started](/guides/quickstart): an account, an agent and `NO
     curl -sS https://bud.noetive.io/v1/send \
       -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
       -H "Content-Type: application/json" \
-      -d '{"to":["anna@example.net"],"subject":"Quarterly review","text":"Does next week work?","idempotency_key":"quickstart-1"}'
+      -d "{\"to\":[\"$ADDRESS\"],\"subject\":\"Quarterly review\",\"text\":\"Does next week work?\",\"idempotency_key\":\"quickstart-1\"}"
 
     curl -sS https://bud.noetive.io/v1/folder.list \
       -H "Authorization: Bearer $NOETIVE_KEY_SECRET" \
       -H "Content-Type: application/json" \
       -d "{\"in\":\"$MAILBOX\",\"folder\":\"inbox\"}"
     ```
+
+    This sends to the agent's own address, so you can watch the message arrive without involving anyone outside your account. Once delivered, the message shows up in the inbox the second call lists; run that call again if it is not there yet.
 
     The reply says whether the message is `queued`, or `held` until a person in your team approves it. A held send carries an `approval_id`; a person approves it, and it goes out then. Never send it again: a new send is a second message, even with a new `idempotency_key`. Pass a new `idempotency_key` for each message: retrying with the same key never sends twice.
   </Step>

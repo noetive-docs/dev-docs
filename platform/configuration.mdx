@@ -92,7 +92,7 @@ The server itself writes no files.
 | Install, fallback | `github.com` | The release binary, if npm did not supply one. Checked against the release's `checksums.txt` before it is made executable, which detects a corrupted download. |
 | Install, container | `ghcr.io` | The `ghcr.io/noetive/noetive-mcp` image |
 | Runtime | `semantik.noetive.io:443` | Every Noetive tool call, over HTTPS |
-| Runtime, direct API | `bud.noetive.io:443` | Bud (Preview), when you call it yourself. The MCP server does not. |
+| Runtime, Bud | `bud.noetive.io:443` | Bud (Preview), through the MCP server's Bud tools when an agent key is set, or when you call it yourself |
 | Runtime, optional | Your `NOETIVE_EMBEDDINGS_URL` | Embeddings, if you set one |
 
 Requests to Semantik honour `HTTPS_PROXY` and `NO_PROXY`. The server sends no background or telemetry traffic: every request is a tool call the agent made and the transcript shows.
