@@ -55,9 +55,9 @@ Members are compared by score, which is why the kinds must agree: a `CONTRAST` m
 
 A member's `seq` values have gaps for messages another member won. In a group, a gap does not by itself mean a lost message.
 
-Messages are still dropped when the winning member's stream is not read fast enough, as for any subscription. A dropped message is not passed to the next member, so read every member's stream promptly.
+When the winning member's stream is not read fast enough, that member misses the message and its stream reports it in a `missed` frame, as for any subscription. The message is not passed to the next member, so read every member's stream promptly. A message won by a member whose stream has just closed is lost in the same way.
 
-Everything else in [Delivery and idempotency](/semantik/delivery) applies unchanged: delivery is at-least-once, and frames carry identifiers, not bodies.
+Everything else in [Delivery and idempotency](/semantik/delivery) applies unchanged: while a stream is open, every match is either delivered or counted in a `missed` frame, and frames carry identifiers, not bodies.
 
 ## Write role queries that compete well
 

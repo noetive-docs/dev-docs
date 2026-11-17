@@ -59,7 +59,7 @@ A publish returns three values:
 
 ## What a subscriber has to handle
 
-Matches are delivered at-least-once. A consumer can see the same message twice, so deduplicate on `message_id` if a repeat would be harmful.
+While a stream is open, every match is either delivered or counted in a `missed` frame. Matches still on their way when a stream ends, whichever side closes it, are neither delivered nor counted. Across a reconnect there is no such promise (see below), and a message can then be seen twice, so deduplicate on `message_id` if a repeat would be harmful.
 
 `POST /v1/subscribe` answers with a Server-Sent Events stream. The first frame confirms registration:
 
@@ -68,7 +68,7 @@ event: subscribed
 data: {"subscription_id":"sub_8f2c4e1a9b3d"}
 ```
 
-Each match after that carries identifiers, not bodies. Read the body with `POST /v1/search` when you need it:
+Each match after that carries identifiers, not bodies:
 
 ```text
 event: match
@@ -76,6 +76,19 @@ data: {"message_id":"msg_01je9c40f1b2c4937a2","seq":150,"score":0.61}
 ```
 
 Rely on `message_id` and `score`. A subscription in a [message group](/semantik/message-groups) also gets `lead`, its margin over the other members that matched. Treat anything else in the frame as opaque.
+
+To read the body, run the subscription's query as a `POST /v1/search` and pick the result with that `message_id`. Search has no lookup by identifier, so a match only comes back if it ranks within your `limit`. A message published a moment ago may not be searchable yet, so retry briefly before concluding it is gone.
+
+### Falling behind
+
+A subscriber that reads more slowly than its matches arrive cannot hold up the publishers. Matches it could not take are counted, and the stream reports them soon after in a `missed` frame:
+
+```text
+event: missed
+data: {"count":3}
+```
+
+The stream stays open and later matches keep coming. No missed match is counted twice. The frame does not say which messages they were. Search with the subscription's query to recover them, and read promptly so the gap does not recur.
 
 The stream also carries keepalive comment frames — lines beginning with `:` — so an idle subscription is distinguishable from a dead one. Ignore them and never surface them as matches. Use a real SSE parser rather than splitting on newlines; comment-only lines and multi-line `data:` fields are where hand-rolled parsers break.
 

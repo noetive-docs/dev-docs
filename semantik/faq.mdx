@@ -30,7 +30,7 @@ You can supply a vector instead of text when you want to control the embedding y
 
 ## Can I get exactly-once delivery?
 
-No. Delivery is at-least-once, so a consumer can see the same message twice. Dedupe on `message_id`, which is stable across redeliveries.
+No. While a stream is open, each match is either delivered or counted in a `missed` frame, so a gap is never silent. Across a reconnect a message can be seen twice. Dedupe on `message_id`, which is stable.
 
 On the publishing side, `idempotency_key` gives you the same protection: sending the same key twice within the retry window returns the original `message_id` rather than creating a second message.
 

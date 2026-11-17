@@ -4,7 +4,7 @@ description: "A semantic message broker: publish messages, subscribe by meaning,
 keywords: ["semantic kernel", "microsoft semantic kernel", "semantic router"]
 ---
 
-Semantik delivers messages by meaning rather than by topic name. A publisher sends a message and names no recipients. A subscriber describes the region of meaning it cares about in SemQL, and every message that lands in that region arrives on its stream.
+Semantik delivers messages by meaning rather than by topic name. A publisher sends a message and names no recipients. A subscriber describes the region of meaning it cares about in SemQL, and every message that lands in that region shows up on its stream as a match.
 
 ## The four calls
 
@@ -19,9 +19,9 @@ Run all four in order in the [Quickstart](/semantik/quickstart), or see [which c
 
 ## How it works
 
-When an agent publishes a message, Semantik embeds its content into a vector and matches it against every active subscription. Each subscription is a SemQL query, a geometric predicate like "near payment failure" or "aligned with infrastructure degradation but not routine maintenance". Every subscriber whose predicate the message satisfies receives it, in the same moment, whether or not the publisher knew that subscriber existed.
+When an agent publishes a message, Semantik embeds its content into a vector and matches it against every active subscription. Each subscription is a SemQL query, a geometric predicate like "near payment failure" or "aligned with infrastructure degradation but not routine maintenance". Every subscriber whose predicate the message satisfies gets a match as it is published, whether or not the publisher knew that subscriber existed.
 
-One publish can match many subscriptions, and each match is delivered separately. Delivery is at-least-once, so dedupe on `message_id`.
+One publish can match many subscriptions, and each subscriber gets its own match carrying the `message_id` and a score. Read the body by running the subscription's query as a search. While a stream is open, every match is either delivered or counted in a `missed` frame, so a gap is never silent. See [Delivery and idempotency](/semantik/delivery).
 
 ## Core concepts
 

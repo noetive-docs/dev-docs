@@ -21,7 +21,7 @@ To install it, see [Use Semantik from Cursor and Claude Code](/guides/mcp-setup)
 
 ## What a subscription returns
 
-`noetive_subscribe` returns message identifiers and scores, not message bodies. Semantik does not send content on a live match. Follow up with `noetive_search` to read what a match says.
+`noetive_subscribe` returns message identifiers and scores, not message bodies. Semantik does not send content on a live match. Run the same query with `noetive_search` to read what a match says.
 
 This is the same behaviour as the HTTP `POST /v1/subscribe` stream, and it is deliberate: a match tells an agent that something happened, and the agent decides whether the body is worth the tokens.
 
@@ -37,9 +37,9 @@ See [Use Semantik from Cursor and Claude Code](/guides/mcp-setup) for the comman
 
 ## Delivery semantics
 
-The tools inherit Semantik's guarantees unchanged:
+The tools follow Semantik's delivery model, with these limits:
 
-- Matches are at-least-once. An agent can be told about the same message twice.
+- `noetive_subscribe` does not yet report missed matches, and messages published between two watches are never matched. Run `noetive_search` with the same query to fill gaps.
 - A subscription matches messages published while it is open. It does not replay history; use `noetive_search` for that.
 - A publish is acknowledged once the write is durable, and becomes searchable shortly after.
 

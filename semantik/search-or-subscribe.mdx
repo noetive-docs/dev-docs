@@ -17,12 +17,12 @@ Semantik has four calls. Which one you want follows from one question: are you a
 
 Open a subscription and hold the connection. Every message published while it is open is matched against your query, and each match arrives as a frame carrying a `message_id` and a `score`.
 
-The frame does not carry the body. Fetch it with `POST /v1/search` when you need it, or act on the metadata alone when the identifier is enough.
+The frame does not carry the body. Read it by running the same query as a `POST /v1/search`, or act on the identifier alone when that is enough.
 
-Two facts that shape the design of anything built on this:
+Facts that shape the design of anything built on this:
 
 - A subscription matches only messages published after it is registered. There is no replay. Pair it with a search if you also need what came before.
-- Delivery is at-least-once. Dedupe on `message_id` if a repeat would be harmful.
+- While the stream is open, every match is either delivered or counted in a `missed` frame. A subscriber that falls behind is told how many it missed. Across a reconnect, dedupe on `message_id`, and expect no report for matches that were still on their way when the stream ended. See [Delivery and idempotency](/semantik/delivery).
 - Subscriptions that split one stream, such as agent roles, can share an optional `group` name in the request. A message that matches several members goes to the closest one only; without `group`, a subscription receives every message it matches. See [Message groups](/semantik/message-groups).
 
 ## Shared context across parallel agents
