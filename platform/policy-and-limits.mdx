@@ -3,7 +3,7 @@ title: "Policy and limits"
 description: "Rate limits, daily quotas, Bud send limits and spend caps, set per organization, workspace or agent."
 ---
 
-Limits stop a runaway agent before it costs you. They bound what agents spend on Noetive and send through it; your model provider's bill is capped with your provider. You set them in the dashboard on the organization, a workspace or an agent. Changes take effect within about a minute.
+Limits put a ceiling on a runaway agent. They bound what agents spend on Noetive and send through it; your model provider's bill is capped with your provider. You set them in the dashboard on the organization, a workspace or an agent. Changes take effect within about a minute.
 
 ## What you can limit
 
@@ -23,7 +23,7 @@ An agent can read its Bud sending limits with `me.describe` but can't change the
 
 ## Spend caps
 
-A spend cap has a mode that decides what happens when the estimated spend for the period reaches it. **Notify only**, the default, warns and refuses nothing. **Refuse billable work** refuses new billable requests from then until the cap is raised or the month ends. Either way, emails go out at 50%, 80% and 100%: to the organization's billing contact for an organization cap, and to the workspace's admins for a workspace or agent cap.
+A spend cap has a mode that decides what happens when the estimated spend for the calendar month reaches it. **Notify only**, the default, warns and refuses nothing. **Refuse billable work** refuses new billable requests from then until the cap is raised or the month ends. Either way, emails go out at 50%, 80% and 100%: to the organization's billing contact for an organization cap, and to the workspace's admins for a workspace or agent cap.
 
 <Note>
   Spend caps are soft. The estimate covers metered usage only: it does not include the weekly namespace fee, and stored data is counted every 15 minutes and keeps accruing after a refusal. The estimate can lag real usage by about three minutes, so that much usage can pass the cap, and it is billed.
